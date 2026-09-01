@@ -1,0 +1,16 @@
+tutorial_id: inbound-triage
+default_deny: true
+capabilities:
+  - id: read-event
+    operation: read
+    resource: one caller-authorized inbound event
+    required: true
+    reason: The pilot must inspect subject and body to suggest a route.
+limits:
+  max_items_per_run: 25
+  max_runtime_seconds: 30
+  network_hosts: []
+prohibited:
+  - create, update, delete, send, publish, approve, or admin operations
+  - wildcard or administrator scope
+  - fallback to another credential or identity

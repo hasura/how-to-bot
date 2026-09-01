@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tutorial_id",
+    "claims"
+  ],
+  "properties": {
+    "tutorial_id": {
+      "type": "string"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text",
+          "label",
+          "level",
+          "scope",
+          "evidence",
+          "date",
+          "limitations"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z]+-[0-9]+$"
+          },
+          "text": {
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "SOURCE",
+              "VERIFIED",
+              "OBSERVED",
+              "HYPOTHESIS"
+            ]
+          },
+          "level": {
+            "enum": [
+              "E0",
+              "E1",
+              "E2",
+              "E3",
+              "E4"
+            ]
+          },
+          "scope": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "limitations": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

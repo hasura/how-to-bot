@@ -1,0 +1,18 @@
+tutorial_id: inbound-triage
+actions:
+  - action: Read an explicitly supplied fixture and produce a private draft.
+    class: automatic
+    enforced_by: local runner with exact-scope and batch-limit checks
+    approver: null
+    preview: []
+  - action: Send, write, close, assign, or publish the suggested disposition.
+    class: prohibited
+    enforced_by: no adapter capability or implementation path exists
+    approver: human-disposition-owner
+    preview: [action, target, recipient, payload, reversibility]
+invalidation:
+  - changed target
+  - changed payload
+  - new permission or tool
+  - expanded batch or recipient set
+  - higher risk tier

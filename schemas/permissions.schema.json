@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tutorial_id",
+    "default_deny",
+    "capabilities",
+    "limits",
+    "prohibited"
+  ],
+  "properties": {
+    "tutorial_id": {
+      "type": "string"
+    },
+    "default_deny": {
+      "const": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operation",
+          "resource",
+          "required",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "read",
+              "create",
+              "update",
+              "delete",
+              "execute",
+              "send",
+              "publish",
+              "approve",
+              "admin"
+            ]
+          },
+          "resource": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "max_items_per_run",
+        "max_runtime_seconds",
+        "network_hosts"
+      ],
+      "properties": {
+        "max_items_per_run": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_runtime_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "network_hosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "prohibited": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

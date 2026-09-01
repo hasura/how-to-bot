@@ -1,0 +1,17 @@
+tutorial_id: inbound-triage
+adapter_id: local-python
+version: 0.1.0
+authentication: caller-supplied local scope set; no credential
+concrete_scope: inbound_events:read
+tools: [Python 3.11 standard library]
+approval_enforcement: no impact operation exists
+idempotency: SHA-256 semantic key with example in-memory ledger
+telemetry: structured result only; raw content omitted
+kill_switch: boolean checked before validation or execution
+credential_revocation: not applicable
+teardown: delete local output
+unsupported:
+  - live source ingestion
+  - durable or concurrent replay protection
+  - external write, send, close, assignment, or publication
+  - production routing accuracy claim

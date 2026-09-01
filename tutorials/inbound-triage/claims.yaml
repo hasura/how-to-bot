@@ -1,0 +1,26 @@
+tutorial_id: inbound-triage
+claims:
+  - id: HTB-1
+    text: The v0.1 local pilot produces route suggestions without network calls or durable external writes.
+    label: VERIFIED
+    level: E2
+    scope: inbound-triage 0.1.0 local-python adapter with synthetic fixtures
+    evidence: [tests/test_repository.py, tutorials/inbound-triage/test_conformance.py]
+    date: "2026-08-31"
+    limitations: This does not demonstrate a live source-system adapter.
+  - id: HTB-2
+    text: Exact replay in one runner process is marked as a duplicate and returns the original semantic outcome.
+    label: VERIFIED
+    level: E2
+    scope: inbound-triage 0.1.0 in-memory example ledger
+    evidence: [tutorials/inbound-triage/test_failure_injection.py::test_duplicate_replay]
+    date: "2026-08-31"
+    limitations: A real adapter requires a durable concurrency-safe ledger.
+  - id: HTB-3
+    text: Sensitive synthetic cases are escalated to the security route and remain human-owned.
+    label: VERIFIED
+    level: E2
+    scope: inbound-triage 0.1.0 synthetic fixtures
+    evidence: [tutorials/inbound-triage/test_conformance.py::test_sensitive_case_escalates]
+    date: "2026-08-31"
+    limitations: Keyword policy is illustrative and not a production classifier.

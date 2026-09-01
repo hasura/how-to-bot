@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://howtobot.ai/schemas/tutorial.schema.json",
+  "title": "How to Bot tutorial manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "version",
+    "status",
+    "risk",
+    "lifecycle",
+    "outcome",
+    "actors",
+    "workflow",
+    "evaluation",
+    "files"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "reviewed",
+        "published",
+        "deprecated",
+        "withdrawn"
+      ]
+    },
+    "license": {
+      "type": "string"
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tier",
+        "rationale"
+      ],
+      "properties": {
+        "tier": {
+          "enum": [
+            "T0",
+            "T1",
+            "T2",
+            "T3",
+            "T4"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maintainer",
+        "domain_owner",
+        "created",
+        "last_verified",
+        "next_review"
+      ],
+      "properties": {
+        "maintainer": {
+          "type": "string"
+        },
+        "domain_owner": {
+          "type": "string"
+        },
+        "security_reviewer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "last_verified": {
+          "type": "string",
+          "format": "date"
+        },
+        "next_review": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": [
+        "job",
+        "users",
+        "non_goals",
+        "inputs",
+        "outputs",
+        "side_effects",
+        "success_criteria",
+        "unacceptable_outcomes"
+      ],
+      "properties": {
+        "job": {
+          "type": "string"
+        },
+        "users": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "side_effects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "success_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unacceptable_outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "actors": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "responsibility"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "responsibility": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "trigger",
+        "termination",
+        "states",
+        "invariants"
+      ],
+      "properties": {
+        "trigger": {
+          "type": "string"
+        },
+        "termination": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invariants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "required": [
+        "fixtures",
+        "commands",
+        "critical_invariants"
+      ],
+      "properties": {
+        "fixtures": {
+          "type": "string"
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "critical_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "required": [
+        "spec",
+        "threat_model",
+        "runbook",
+        "permissions",
+        "approvals",
+        "claims"
+      ],
+      "properties": {
+        "spec": {
+          "type": "string"
+        },
+        "threat_model": {
+          "type": "string"
+        },
+        "runbook": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "string"
+        },
+        "approvals": {
+          "type": "string"
+        },
+        "claims": {
+          "type": "string"
+        },
+        "adapter": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

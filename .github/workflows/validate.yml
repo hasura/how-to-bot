@@ -1,0 +1,25 @@
+name: validate
+on:
+  pull_request:
+  push:
+    branches: [main, "bootstrap/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run python tools/validate.py
+      - run: uv run python tools/check_links.py
+      - run: uv run python tools/secret_scan.py
+      - run: uv run ruff check .
+      - run: uv run pytest
+      - run: uv run python tutorials/inbound-triage/run.py tutorials/inbound-triage/fixtures/events.json
