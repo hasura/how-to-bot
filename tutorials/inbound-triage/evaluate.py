@@ -349,9 +349,12 @@ def run_adversarial_probes(
 
     ledger = DurableLedger()
     original_finalize = ledger.finalize
+    original_monotonic = triage_module.time.monotonic
+    finalization_clock = {"now": 100.0}
+    triage_module.time.monotonic = lambda: finalization_clock["now"]
 
     def delayed_finalize(*args, **kwargs):
-        time.sleep(0.012)
+        finalization_clock["now"] += 0.012
         return original_finalize(*args, **kwargs)
 
     ledger.finalize = delayed_finalize
@@ -374,6 +377,7 @@ def run_adversarial_probes(
             ) == "failed"
         probes.append({"id": "finalization_deadline", "passed": passed})
     finally:
+        triage_module.time.monotonic = original_monotonic
         ledger.close_and_delete(actor_id=OWNER)
 
     class FailTerminalOnce(TelemetrySink):
@@ -422,9 +426,12 @@ def run_adversarial_probes(
     batch_policy = policy_for(batch_events)
     ledger = DurableLedger()
     original_route = triage_module._route
+    original_monotonic = triage_module.time.monotonic
+    batch_clock = {"now": 100.0}
+    triage_module.time.monotonic = lambda: batch_clock["now"]
 
     def slow_route(item):
-        time.sleep(0.018)
+        batch_clock["now"] += 0.018
         return original_route(item)
 
     triage_module._route = slow_route
@@ -450,6 +457,7 @@ def run_adversarial_probes(
         probes.append({"id": "shared_batch_deadline", "passed": passed})
     finally:
         triage_module._route = original_route
+        triage_module.time.monotonic = original_monotonic
         ledger.close_and_delete(actor_id=OWNER)
 
     oversized = [

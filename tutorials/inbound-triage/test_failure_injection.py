@@ -675,13 +675,17 @@ def test_third_review_non_finite_runtime_fails_closed(runtime):
 
 
 def test_third_review_finalization_obeys_step_and_global_deadlines(monkeypatch):
+    import howtobot.inbound_triage as module
+
     item = event("evt-finalization-deadline")
     state = runtime([item])
     original_finalize = state[2].finalize
     monkeypatch.setitem(STEP_TIMEOUT_SECONDS, "record-draft", 0.01)
+    clock = {"now": 100.0}
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock["now"])
 
     def delayed_finalize(*args, **kwargs):
-        time.sleep(0.02)
+        clock["now"] += 0.02
         return original_finalize(*args, **kwargs)
 
     state[2].finalize = delayed_finalize
@@ -731,9 +735,11 @@ def test_third_review_batch_uses_one_absolute_deadline(monkeypatch):
     items = [event("evt-batch-budget-a"), event("evt-batch-budget-b")]
     context, policy, ledger, telemetry, switch = runtime(items)
     original_route = module._route
+    clock = {"now": 100.0}
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock["now"])
 
     def slow_route(item):
-        time.sleep(0.018)
+        clock["now"] += 0.018
         return original_route(item)
 
     monkeypatch.setattr(module, "_route", slow_route)

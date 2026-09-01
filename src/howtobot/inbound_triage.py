@@ -981,6 +981,10 @@ def triage_one(
             run_id=run_id,
             deadline=claim_deadline,
         )
+        # Record ownership before any subsequent fence can raise. Otherwise a
+        # deadline or stop in this narrow window leaves a durable executing claim
+        # while exception cleanup incorrectly believes there is nothing to abort.
+        claimed = mode == "owner"
         fence("claimed", step_started=step_started, step="claim-intent")
         if mode == "duplicate":
             assert prior is not None
@@ -1009,7 +1013,6 @@ def triage_one(
             trace.transition("succeeded", "original_outcome_reused")
             return replace(prior, duplicate=True, run_id=run_id)
 
-        claimed = True
         if recovered:
             recovery_started = time.monotonic()
         trace.emit("claim", "recovered" if recovered else "acquired", owner_run_id=run_id)

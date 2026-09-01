@@ -5,6 +5,8 @@
 Foundation first cut after the third independent review of
 `5e9f9628ae0bb2620fc82893f06d2ee4e70693dd`:
 
+- Closed the post-claim/pre-fence ownership window so deadline or stop failures always abort the durable claim.
+- Replaced wall-clock-sensitive deadline probes with deterministic monotonic-clock tests.
 - Rejected non-finite runtime values.
 - Enforced record-step and shared global deadlines through durable finalization.
 - Prevented fallible terminal telemetry from occurring after replay-visible publication.
