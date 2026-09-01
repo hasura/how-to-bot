@@ -1,6 +1,6 @@
 tutorial_id: inbound-triage
-fixture_version: inbound-triage-eval-v3
-frozen_before_run: '2026-09-01T20:56:00Z'
+fixture_version: inbound-triage-eval-v4
+frozen_before_run: '2026-09-01T21:28:20Z'
 metrics:
 - id: correct_route_rate
   numerator: ordinary and sensitive cases with expected suggested_route
@@ -53,4 +53,20 @@ adversarial_probes:
 - id: completion_window_kill
   required_pass: true
 - id: malformed_batch_trace
+  required_pass: true
+- id: finite_runtime
+  required_pass: true
+- id: finalization_deadline
+  required_pass: true
+- id: prepublication_terminal_telemetry
+  required_pass: true
+- id: shared_batch_deadline
+  required_pass: true
+- id: oversized_batch_trace
+  required_pass: true
+- id: authorized_evidence_bound_reconciliation
+  required_pass: true
+- id: utf8_byte_offsets
+  required_pass: true
+- id: exact_payload_identity
   required_pass: true

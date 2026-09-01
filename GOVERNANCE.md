@@ -1,13 +1,13 @@
 # Governance
 
-## Accountable owners for the Gate 2 pilot
+## Accountable owners for the foundation pilot
 
 - **Repository steward, tutorial maintainer, domain owner, disposition owner, and
   security-exception owner:** Anushrut Gupta.
 - **Reliability/reproducibility reviewer:** independent reviewer bot
   `372780cd-861e-43a3-8b37-939b82cfa693`.
 
-These identities apply to the current single-pilot Gate 2 scope. Future tutorials must
+These identities apply to the current single-pilot foundation scope. Future tutorials must
 name their own accountable people; role placeholders do not satisfy the schema.
 
 No author may self-certify independent reproduction. The reviewer may block merge or
@@ -16,10 +16,11 @@ or provenance is unclear.
 
 ## Decisions
 
-Normative standard changes require a pull request, impact notes, migration guidance,
-and steward plus independent-review approval. The frozen Gate 2 rubric may not be
-weakened to make an implementation pass. Security fixes may be privately coordinated
-until a safe patch exists.
+Normative standard changes require impact notes, migration guidance, and independent
+review before their claims are promoted or publicly approved. Repository setup may use
+direct implementation ownership; pull-request ceremony is optional during that phase.
+The frozen 36-check review rubric may not be weakened to make an implementation pass.
+Security fixes may be privately coordinated until a safe patch exists.
 
 ## Maintenance and invalidation
 

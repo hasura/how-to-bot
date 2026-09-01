@@ -7,6 +7,7 @@ Install uv 0.12.8; `.python-version` selects CPython 3.14.4.
 ```bash
 uv sync --frozen
 uv run python tools/validate.py
+uv run python tools/build_site.py --check
 uv run python tools/check_links.py
 uv run python tools/secret_scan.py
 uv run ruff check .
@@ -22,16 +23,20 @@ exceptions to be visible.
 ## Stop while idle or mid-run
 
 Anushrut Gupta calls `KillSwitch.activate(actor_id=..., reason=...)` independently of
-event/model content. The switch blocks new work and is checked throughout execution, including after staged ledger completion and atomically at final publication.
+event/model content. The switch blocks new work and is checked throughout execution, including after staged ledger completion and atomically at final publication. Terminal telemetry and durable publication share one locked boundary: neither a false success event nor a replay-visible result may survive if the other side fails.
 Record the audit entry and inspect the ledger for executing/cancelled entries. There is
 no side-effect inventory because this adapter has no effect capability.
 
 ## Reconcile and resume
 
 Mark a genuinely abandoned `executing` claim interrupted using the owner-only ledger
-operation. Reconcile every failed/cancelled entry. Recheck exact version, current
-requester policy, source version, limits, and complete tests. Anushrut Gupta may then
-call `resume(..., reconciled=True, reason=..., ledger=ledger)`. A caller assertion without the ledger, or a ledger with any executing, failed, cancelled, or staged entry, fails.
+operation. Recheck the observed event fingerprint and terminal state, then reconcile
+with the owner identity, exact fingerprint, expected terminal state, and a non-empty
+reason. Recheck exact version, current requester policy, source version, limits, and
+complete tests. Anushrut Gupta may then call
+`resume(..., reconciled=True, reason=..., ledger=ledger)`. A caller assertion without
+the ledger, manufactured reconciliation evidence, or a ledger with any executing,
+failed, cancelled, or staged entry fails.
 
 A recovered run must emit claim, retry, outcome, and reconciled events and still yield only one finalized semantic outcome; stale owners must receive a conflict. Two failed attempts trigger the repeated-error stop; investigate rather than
 retrying again.

@@ -130,6 +130,27 @@ def _validate_cross_file_contract(
             f"{sorted(MATERIAL_CHANGE_TRIGGERS)}"
         )
 
+    discovery = tutorial.get("discovery", {})
+    ownership = tutorial.get("ownership", {})
+    progression = tutorial.get("progression", {})
+    roles = set(discovery.get("roles", []))
+    users = set(tutorial.get("outcome", {}).get("users", []))
+    if roles != users:
+        errors.append(
+            f"{relative_manifest}: discovery.roles must equal outcome.users"
+        )
+    if ownership.get("mode") == "COMPLETE":
+        done_condition = ownership.get("healthy_or_done_condition", "").casefold()
+        if not any(term in done_condition for term in ("done", "terminal", "outcome", "stop")):
+            errors.append(
+                f"{relative_manifest}: COMPLETE ownership must state a verifiable done condition"
+            )
+    expected_stages = {"try_it", "run_repeatedly", "operate_safely"}
+    if set(progression) != expected_stages:
+        errors.append(
+            f"{relative_manifest}: progression must define exactly {sorted(expected_stages)}"
+        )
+
     status = tutorial.get("status")
     retest_required = tutorial.get("lifecycle", {}).get("retest_required")
     retest_reason = tutorial.get("lifecycle", {}).get("retest_reason")

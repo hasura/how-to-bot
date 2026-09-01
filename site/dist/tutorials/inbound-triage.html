@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="How to Bot: verified operational playbooks for persistent workplace bots.">
+<title>Inbound triage with suggested resolution and routing — How to Bot</title>
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="../index.html" aria-label="How to Bot home">
+    <span class="brand-mark" aria-hidden="true">H</span>
+    <span>How to Bot</span>
+  </a>
+  <nav aria-label="Primary">
+    <a href="../index.html#library">Library</a>
+    <a href="../index.html#standard">Standard</a>
+    <a href="https://github.com/hasura/how-to-bot">GitHub</a>
+  </nav>
+</header>
+<main id="main">
+
+<article class="tutorial-page">
+  <header class="tutorial-hero">
+    <a class="back" href="../index.html#library">← Tutorial library</a>
+    <div class="card-meta">
+      <span class="mode complete">COMPLETE</span>
+      <span class="risk">T1</span>
+      <span class="status">Needs Retest</span>
+      <span>v0.4.0</span>
+    </div>
+    <h1>Inbound triage with suggested resolution and routing</h1>
+    <p class="lede">Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+    <div class="taxonomy">
+      <div><strong>Roles</strong><span class="chip">support operator</span><span class="chip">operations operator</span><span class="chip">finance operator</span><span class="chip">recruiting operator</span></div>
+      <div><strong>Playbooks</strong><span class="chip">inbound triage</span><span class="chip">private draft routing</span></div>
+      <div><strong>Patterns</strong><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span><span class="chip pattern">bounded execution with kill switch</span><span class="chip pattern">evidence-grounded abstention and escalation</span></div>
+    </div>
+  </header>
+  <section class="outcome-contract">
+    <div><p class="eyebrow">Owned object</p><p>one versioned inbound event and its private draft disposition</p></div>
+    <div><p class="eyebrow">Healthy / done condition</p><p>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</p></div>
+  </section>
+  <section class="tutorial-section">
+    <p class="eyebrow">Progressive tutorial</p>
+    <h2>From first run to safe operation.</h2>
+    <div class="tutorial-steps">
+
+<article>
+  <span class="stage-number">01</span>
+  <div><h3>Try it</h3><p>Run the deterministic pilot once on synthetic events and inspect private drafts.</p><ul><li>install the locked environment with uv sync --frozen</li><li>run the supplied synthetic fixture through the local adapter</li><li>confirm outputs remain drafts with exact evidence and no side effects</li></ul>
+  <p class="exit"><strong>Exit:</strong> The sample run finishes with deterministic drafts and no external action.</p></div>
+</article>
+
+<article>
+  <span class="stage-number">02</span>
+  <div><h3>Run it repeatedly</h3><p>Prove replay, ordering, recovery, and evaluation behavior are repeatable.</p><ul><li>run all repository and tutorial tests</li><li>run the frozen evaluation and inspect raw numerators and denominators</li><li>exercise serial, concurrent, reordered, failed, cancelled, and recovered cases</li></ul>
+  <p class="exit"><strong>Exit:</strong> All frozen tests and zero-failure invariants pass repeatedly.</p></div>
+</article>
+
+<article>
+  <span class="stage-number">03</span>
+  <div><h3>Operate it safely</h3><p>Understand the controls required before adapting the playbook to live systems.</p><ul><li>review permissions, approvals, threat model, failure matrix, and runbook</li><li>keep the adapter no-write until a separately reviewed T2 contract exists</li><li>retest after every permission, policy, runtime, dependency, model, adapter, or incident change</li><li>use the owner-controlled kill switch and evidence-bound reconciliation procedure</li></ul>
+  <p class="exit"><strong>Exit:</strong> Operators can identify authorization, approval, monitoring, recovery, escalation, and stop boundaries without inferring them from prompt text.</p></div>
+</article>
+
+    </div>
+  </section>
+  <div class="detail-grid">
+    <section class="tutorial-section">
+      <p class="eyebrow">Verification evidence</p>
+      <h2>How you know.</h2>
+      <ul><li>current-policy authorization decision</li><li>exact source version and UTF-8 byte evidence spans</li><li>durable fenced ledger state</li><li>redacted transition, plan, retry, and outcome telemetry</li><li>frozen evaluation metrics and adversarial regression results</li></ul>
+    </section>
+    <section class="tutorial-section boundary">
+      <p class="eyebrow">Stop · approve · escalate</p>
+      <h2>Where autonomy ends.</h2>
+      <ul><li>stop on authorization, validation, telemetry, deadline, conflict, or kill-switch failure</li><li>abstain on unsupported or contradictory evidence</li><li>route sensitive matches to the named owner</li><li>leave every final disposition to Anushrut Gupta outside this no-write adapter</li></ul>
+    </section>
+  </div>
+  <section class="tutorial-section contract">
+    <p class="eyebrow">Operational contract</p>
+    <h2>What this playbook guarantees—and does not.</h2>
+    <div class="contract-grid">
+      <div><h3>Success criteria</h3><ul><li>Frozen ordinary cases route according to deterministic policy.</li><li>Unsupported and contradictory cases abstain.</li><li>Sensitive cases escalate to security and remain owned by Anushrut Gupta.</li><li>Serial, concurrent, reordered, and recovered replay yield one semantic outcome.</li><li>Denied, failed, cancelled, retried, succeeded, and recovered histories are reconstructable.</li></ul></div>
+      <div><h3>Unacceptable outcomes</h3><ul><li>Source text changes permissions, policy, recipients, tools, approval, or impact.</li><li>Unauthorized or revoked records reveal content or produce a suggestion.</li><li>Same event identity with changed content produces a second semantic outcome.</li><li>Stale, malformed, conflicting, or unsupported input is silently treated as ordinary.</li><li>Work continues after deadline or kill-switch activation.</li><li>A suggestion is sent, committed, or finalized automatically.</li></ul></div>
+      <div><h3>Non-goals</h3><ul><li>Send a response or alert.</li><li>Close, assign, update, create, or publish an external record.</li><li>Make a high-stakes or final disposition.</li><li>Claim production routing accuracy or live-source compatibility.</li></ul></div>
+      <div><h3>Limitations</h3><ul><li>No live source, credential, model, network, recurring trigger, or external destination is included.</li><li>SQLite state is durable across local adapter processes and restarts sharing one filesystem, but is not a multi-host or distributed ledger.</li><li>Keyword routing is illustrative and not a production classifier.</li><li>Timeout enforcement is cooperative at declared step fences; this no-I/O deterministic adapter has no blocking external dependency to preempt.</li><li>Awaiting-approval and partial-side-effect paths are present in the neutral state vocabulary but unreachable in this T1 no-write adapter.</li></ul></div>
+    </div>
+  </section>
+  <section class="source-callout">
+    <div><p class="eyebrow">Inspect and reproduce</p><h2>The readable page is not the source of truth.</h2>
+    <p>This page is generated from the validated manifest. Review the full permissions,
+    approvals, threat model, evaluation, failure matrix, and implementation in the repository.</p></div>
+    <a class="button primary" href="https://github.com/hasura/how-to-bot/tree/main/tutorials/inbound-triage">Open source files</a>
+  </section>
+</article>
+
+</main>
+<footer>
+  <p><strong>How to Bot</strong> · Open operational playbooks, not prompt snippets.</p>
+  <p>Apache-2.0 · <a href="https://github.com/hasura/how-to-bot">Source and contribution guide</a></p>
+</footer>
+<script>
+for (const button of document.querySelectorAll('[data-view]')) {
+  button.addEventListener('click', () => {
+    const view = button.dataset.view;
+    document.querySelectorAll('[data-view]').forEach(item => {
+      item.classList.toggle('active', item === button);
+      item.setAttribute('aria-pressed', String(item === button));
+    });
+    document.querySelectorAll('[data-kind]').forEach(section => {
+      section.hidden = section.dataset.kind !== view;
+    });
+  });
+}
+</script>
+</body>
+</html>

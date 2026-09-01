@@ -5,7 +5,7 @@
 The requester is `synthetic-user-operator`; the operator is `synthetic-operator`.
 Anushrut Gupta owns source policy, final disposition, sensitive exceptions, ledger
 administration, and stop control. The synthetic reporter is the affected party.
-The concrete tool is local-python adapter 0.3.0 with Python 3.14.4 and SQLite. There is
+The concrete tool is local-python adapter 0.4.0 with Python 3.14.4 and SQLite. There is
 no model, credential, live source, network host, or external destination.
 
 Assets are inbound content, reporter privacy, current authorization policy, routing
@@ -30,12 +30,16 @@ Trust boundaries:
 | Excessive agency | No destination/network/effect method; every result remains draft |
 | Sensitive routine handling | Exact evidence triggers security transfer to Anushrut Gupta |
 | Unsupported or contradictory evidence | Explicit abstention with no suggested resolution |
+| Non-finite or reset runtime | Finite numeric limit validation and one shared absolute batch deadline |
+| Oversized batch | Attributable batch run ID with governed received → failed trace |
 | Concurrent/replayed delivery | SQLite atomic claim; owner_run_id-fenced completion/abort; finalized exact reuse; changed-content conflict |
 | Adapter crash after claim | Durable intent, owner-marked interruption, fenced recovery, and stale-owner rejection |
+| Finalization overrun | Deadline checks inside the durable transaction; failed publication emits no success telemetry |
+| Reconciliation forgery | Owner-only compare-and-set against observed fingerprint and terminal state |
 | Runaway work | Batch/text/freshness limits, fixed 30s global ceiling, six step timeouts, and repeated-error stop |
 | Ignored stop | Activation-generation fence through final publication; ledger-verified owner resume |
 | Telemetry leakage | No raw content; reconstructable redacted plan/outcome; ACL/retention/redaction tests |
-| Telemetry outage | Visible failure before authorization/routing; no impact exists |
+| Telemetry outage | Terminal events are validated before publication and exposed only after the durable commit; failed telemetry publishes no result |
 | Stale state | Seven-day owner-enforced purge, per-record delete, and full reset |
 
 ## Residual limits

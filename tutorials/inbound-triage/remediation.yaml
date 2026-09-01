@@ -1,61 +1,176 @@
-reviewed_head: 1f4e4a6c835c402abe44cbcfbb5e526edca7e859
+reviewed_head: 5e9f9628ae0bb2620fc82893f06d2ee4e70693dd
 rubric_version: howtobot.ai independent review contract v0.1
 rubric_changed: false
 review_verdict: FAIL_DO_NOT_MERGE
-review_counts: {pass: 14, fail: 18, not_applicable: 4}
-remediation_status: implemented_locally_awaiting_independent_retest
+review_counts:
+  pass: 14
+  fail: 18
+  not_applicable: 4
+remediation_status: v0.4.0_implemented_locally_awaiting_independent_retest
 failed_rows:
   SCH-01:
-    changes: [Aligned tutorial, adapter, claims, state governance, and implementation on file-backed SQLite DurableLedger.]
-    tests: [tools/validate.py, tests/test_repository.py::test_manifest_contract_is_fully_resolved]
+    changes:
+    - Aligned tutorial
+    - adapter
+    - claims
+    - state governance
+    - and implementation on file-backed SQLite DurableLedger.
+    tests:
+    - tools/validate.py
+    - tests/test_repository.py::test_manifest_contract_is_fully_resolved
   SCH-02:
-    changes: [Defined one exact local-filesystem durability and recovery envelope; removed process-local contradictions.]
-    tests: [tests/test_repository.py::test_outcome_contract_traces_to_tests]
+    changes:
+    - Defined one exact local-filesystem durability and recovery envelope; removed process-local contradictions.
+    tests:
+    - tests/test_repository.py::test_outcome_contract_traces_to_tests
   SCH-04:
-    changes: [Enforced all six declared step timeouts and fenced record completion through final stop/deadline verification.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_each_declared_step_timeout_is_enforced, tutorials/inbound-triage/test_failure_injection.py::test_recovery_step_timeout_is_enforced, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_kill_activation_during_completion_prevents_success]
+    changes:
+    - Enforced all six declared step timeouts and fenced record completion through final stop/deadline verification.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_each_declared_step_timeout_is_enforced
+    - tutorials/inbound-triage/test_failure_injection.py::test_recovery_step_timeout_is_enforced
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_kill_activation_during_completion_prevents_success
   EVD-01:
-    changes: [Corrected HTB-2 source, scope, procedure, evidence, and SQLite limitations.]
-    tests: [schemas/claims.schema.json, tools/validate.py]
+    changes:
+    - Corrected HTB-2 source
+    - scope
+    - procedure
+    - evidence
+    - and SQLite limitations.
+    tests:
+    - schemas/claims.schema.json
+    - tools/validate.py
   EVD-02:
-    changes: [Withheld demonstrated labels pending independent v0.3.0 reproduction and added exact denominators and limitations.]
-    tests: [tutorials/inbound-triage/test_evaluation.py, tutorials/inbound-triage/claims.yaml]
+    changes:
+    - Withheld demonstrated labels pending independent v0.4.0 reproduction and added exact denominators and limitations.
+    tests:
+    - tutorials/inbound-triage/test_evaluation.py
+    - tutorials/inbound-triage/claims.yaml
   STA-01:
-    changes: [Traced malformed batches and fenced terminal ownership so recovered and stale owners cannot both succeed.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_malformed_batch_is_traced_validation_failure, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner]
+    changes:
+    - Traced malformed batches and fenced terminal ownership so recovered and stale owners cannot both succeed.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_malformed_batch_is_traced_validation_failure
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner
   STA-02:
-    changes: [Documented actual SQLite location and enforced owner_run_id generation fencing across interruption and recovery.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_durable_interrupted_claim_recovers_after_adapter_restart, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner]
+    changes:
+    - Documented actual SQLite location and enforced owner_run_id generation fencing across interruption and recovery.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_durable_interrupted_claim_recovers_after_adapter_restart
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner
   STA-03:
-    changes: [Bound complete, finalize, and abort to event_id plus owner_run_id and rejected stale owners.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner]
+    changes:
+    - Bound complete
+    - finalize
+    - and abort to event_id plus owner_run_id and rejected stale owners.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner
   FUN-01:
-    changes: [Promoted all six independent attacks into evaluation v3 and nine zero-failure invariant computations.]
-    tests: [tutorials/inbound-triage/evaluate.py, tutorials/inbound-triage/test_evaluation.py]
+    changes:
+    - Preserved the original six attacks and added all eight third-review attacks to evaluation v4 with nine zero-failure
+      invariants.
+    tests:
+    - tutorials/inbound-triage/evaluate.py
+    - tutorials/inbound-triage/test_evaluation.py
   FUN-03:
-    changes: [Added strict extended RFC3339 syntax and governed validation before batch sorting.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_rejects_iso_basic_timestamp, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_malformed_batch_is_traced_validation_failure]
+    changes:
+    - Added strict extended RFC3339 syntax and governed validation before batch sorting.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_rejects_iso_basic_timestamp
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_malformed_batch_is_traced_validation_failure
   REP-02:
-    changes: [Added deterministic owner-recovery race evaluation proving one logical finalized outcome.]
-    tests: [tutorials/inbound-triage/evaluate.py, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner]
+    changes:
+    - Added deterministic owner-recovery race evaluation proving one logical finalized outcome.
+    tests:
+    - tutorials/inbound-triage/evaluate.py
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner
   OBS-01:
-    changes: [Added redacted claim ownership, route plan, result, evidence-count, confidence, flags, and terminal outcome telemetry; traced malformed batches from received.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_success_outcome_is_reconstructable_from_redacted_telemetry, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_malformed_batch_is_traced_validation_failure]
+    changes:
+    - Added redacted claim ownership
+    - route plan
+    - result
+    - evidence-count
+    - confidence
+    - flags
+    - and terminal outcome telemetry; traced malformed batches from received.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_success_outcome_is_reconstructable_from_redacted_telemetry
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_malformed_batch_is_traced_validation_failure
   FAIL-01:
-    changes: [Added and preserved the six exact independent attacks in canonical pytest and evaluation gates.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py, tutorials/inbound-triage/evaluate.py]
+    changes:
+    - Preserved all 14 adversarial attacks in canonical pytest and evaluation gates.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py
+    - tutorials/inbound-triage/evaluate.py
   FAIL-02:
-    changes: [Rejected runtime expansion above 30 seconds and enforced every declared per-step timeout.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_runtime_ceiling_cannot_be_expanded, tutorials/inbound-triage/test_failure_injection.py::test_each_declared_step_timeout_is_enforced]
+    changes:
+    - Rejected runtime expansion above 30 seconds and enforced every declared per-step timeout.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_runtime_ceiling_cannot_be_expanded
+    - tutorials/inbound-triage/test_failure_injection.py::test_each_declared_step_timeout_is_enforced
   KILL-01:
-    changes: [Serialized final ledger publication against kill-switch generation and required ledger-verified reconciliation for resume.]
-    tests: [tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_kill_activation_during_completion_prevents_success, tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_resume_requires_ledger_verified_reconciliation]
+    changes:
+    - Serialized final ledger publication against kill-switch generation and required ledger-verified reconciliation
+      for resume.
+    tests:
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_kill_activation_during_completion_prevents_success
+    - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_resume_requires_ledger_verified_reconciliation
   PLT-02:
-    changes: [Aligned adapter contract with the neutral failure suite and made all independent attacks mandatory.]
-    tests: [tutorials/inbound-triage/test_conformance.py, tutorials/inbound-triage/test_failure_injection.py, tutorials/inbound-triage/evaluate.py]
+    changes:
+    - Aligned adapter contract with the neutral failure suite and made all independent attacks mandatory.
+    tests:
+    - tutorials/inbound-triage/test_conformance.py
+    - tutorials/inbound-triage/test_failure_injection.py
+    - tutorials/inbound-triage/evaluate.py
   MNT-01:
-    changes: [Set status needs_retest and retest_required true; blocked demonstrated claims until fresh independent review.]
-    tests: [tests/test_lifecycle.py, tests/test_repository.py::test_manifest_contract_is_fully_resolved]
+    changes:
+    - Set status needs_retest and retest_required true; blocked demonstrated claims until fresh independent review.
+    tests:
+    - tests/test_lifecycle.py
+    - tests/test_repository.py::test_manifest_contract_is_fully_resolved
   MNT-02:
-    changes: [Replaced stale prior-review assertions with this exact 18-row matrix and retained every failure as a blocker.]
-    tests: [tests/test_repository.py::test_remediation_covers_every_failed_row_with_tests]
+    changes:
+    - Replaced stale prior-review assertions with this exact 18-row matrix and retained every failure as a blocker.
+    tests:
+    - tests/test_repository.py::test_remediation_covers_every_failed_row_with_tests
+third_review_attacks:
+  non_finite_runtime:
+    change: Reject NaN and positive/negative infinity before work.
+    tests:
+    - test_third_review_non_finite_runtime_fails_closed
+    - evaluate.py::finite_runtime
+  finalization_deadline:
+    change: Enforce record-step and global deadlines inside durable finalization; expose no false success telemetry.
+    tests:
+    - test_third_review_finalization_obeys_step_and_global_deadlines
+    - evaluate.py::finalization_deadline
+  post_publication_telemetry:
+    change: Validate terminal telemetry before publication and reveal it only after the durable commit.
+    tests:
+    - test_third_review_telemetry_failure_cannot_follow_durable_publication
+    - evaluate.py::prepublication_terminal_telemetry
+  batch_deadline_reset:
+    change: Apply one absolute runtime deadline to every item in a batch.
+    tests:
+    - test_third_review_batch_uses_one_absolute_deadline
+    - evaluate.py::shared_batch_deadline
+  oversized_batch_trace:
+    change: Give batch policy rejection a run ID and governed received-to-failed telemetry.
+    tests:
+    - test_third_review_oversized_batch_has_run_id_and_terminal_trace
+    - evaluate.py::oversized_batch_trace
+  reconciliation_forgery:
+    change: Require owner identity, exact observed fingerprint/state, and a reason.
+    tests:
+    - test_third_review_reconciliation_is_owner_authorized_and_evidence_bound
+    - evaluate.py::authorized_evidence_bound_reconciliation
+  utf8_offsets:
+    change: Emit and verify UTF-8 byte offsets rather than character positions.
+    tests:
+    - test_third_review_evidence_offsets_are_utf8_byte_offsets
+    - evaluate.py::utf8_byte_offsets
+  whitespace_identity:
+    change: Fingerprint exact validated payload bytes so whitespace changes conflict.
+    tests:
+    - test_third_review_whitespace_changed_payload_is_conflict
+    - evaluate.py::exact_payload_identity

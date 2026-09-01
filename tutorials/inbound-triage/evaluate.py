@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-import hashlib
 import json
 from pathlib import Path
 import threading
 import time
 
 import yaml
+import howtobot.inbound_triage as triage_module
 
 from howtobot.inbound_triage import (
     AuthorizationError,
@@ -22,8 +22,10 @@ from howtobot.inbound_triage import (
     REQUIRED_SCOPE,
     RequestContext,
     TelemetrySink,
+    TelemetryUnavailableError,
     TriageError,
     ValidationError,
+    _fingerprint,
     triage_batch,
     triage_one,
 )
@@ -55,18 +57,7 @@ def policy_for(events: list[dict]) -> AuthorizationPolicy:
 
 
 def event_fingerprint(event: dict) -> str:
-    semantic = "\x1f".join(
-        event[field].strip()
-        for field in (
-            "received_at",
-            "source",
-            "source_version",
-            "subject",
-            "body",
-            "reporter",
-        )
-    )
-    return hashlib.sha256(semantic.encode()).hexdigest()
+    return _fingerprint(event)
 
 
 def run_cases(cases: list[dict], policy: AuthorizationPolicy) -> list[dict]:
@@ -328,6 +319,275 @@ def run_adversarial_probes(
                 and trace[-1]["code"] == "validation"
             )
         probes.append({"id": "malformed_batch_trace", "passed": passed})
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    # Third-review probes: these independently execute the eight newly fixed attacks.
+    ledger = DurableLedger()
+    telemetry = TelemetrySink()
+    try:
+        try:
+            triage_one(
+                authorized_event,
+                context=context(),
+                authorization_policy=policy,
+                ledger=ledger,
+                telemetry=telemetry,
+                kill_switch=KillSwitch(owner_id=OWNER),
+                evaluation_time=NOW,
+                max_runtime_seconds=float("nan"),
+            )
+            passed = False
+        except PolicyError as exc:
+            trace = telemetry.events_for(exc.run_id, actor_role="independent-reviewer")
+            passed = bool(trace and trace[-1]["code"] == "policy" and not ledger.snapshot(
+                actor_role="independent-reviewer"
+            ))
+        probes.append({"id": "finite_runtime", "passed": passed})
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    ledger = DurableLedger()
+    original_finalize = ledger.finalize
+
+    def delayed_finalize(*args, **kwargs):
+        time.sleep(0.012)
+        return original_finalize(*args, **kwargs)
+
+    ledger.finalize = delayed_finalize
+    try:
+        try:
+            triage_one(
+                authorized_event,
+                context=context(),
+                authorization_policy=policy,
+                ledger=ledger,
+                telemetry=TelemetrySink(),
+                kill_switch=KillSwitch(owner_id=OWNER),
+                evaluation_time=NOW,
+                max_runtime_seconds=0.01,
+            )
+            passed = False
+        except DeadlineExceededError:
+            passed = ledger.snapshot(actor_role="independent-reviewer").get(
+                authorized_event["id"]
+            ) == "failed"
+        probes.append({"id": "finalization_deadline", "passed": passed})
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    class FailTerminalOnce(TelemetrySink):
+        def __init__(self):
+            super().__init__()
+            self.failed = False
+
+        def publish_with_terminal_events(self, events, *, publish):
+            if not self.failed:
+                self.failed = True
+                raise TelemetryUnavailableError("synthetic terminal telemetry outage")
+            return super().publish_with_terminal_events(events, publish=publish)
+
+    ledger = DurableLedger()
+    telemetry = FailTerminalOnce()
+    try:
+        try:
+            triage_one(
+                authorized_event,
+                context=context(),
+                authorization_policy=policy,
+                ledger=ledger,
+                telemetry=telemetry,
+                kill_switch=KillSwitch(owner_id=OWNER),
+                evaluation_time=NOW,
+            )
+            passed = False
+        except TelemetryUnavailableError as exc:
+            trace = telemetry.events_for(exc.run_id, actor_role="independent-reviewer")
+            passed = bool(
+                ledger.snapshot(actor_role="independent-reviewer").get(
+                    authorized_event["id"]
+                ) == "failed"
+                and trace
+                and trace[-1]["state"] == "failed"
+                and not any(row["state"] == "succeeded" for row in trace)
+            )
+        probes.append({"id": "prepublication_terminal_telemetry", "passed": passed})
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    batch_events = [
+        {**authorized_event, "id": "eval-batch-a"},
+        {**authorized_event, "id": "eval-batch-b"},
+    ]
+    batch_policy = policy_for(batch_events)
+    ledger = DurableLedger()
+    original_route = triage_module._route
+
+    def slow_route(item):
+        time.sleep(0.018)
+        return original_route(item)
+
+    triage_module._route = slow_route
+    try:
+        try:
+            triage_batch(
+                batch_events,
+                context=context(),
+                authorization_policy=batch_policy,
+                ledger=ledger,
+                telemetry=TelemetrySink(),
+                kill_switch=KillSwitch(owner_id=OWNER),
+                evaluation_time=NOW,
+                max_runtime_seconds=0.03,
+            )
+            passed = False
+        except DeadlineExceededError:
+            snapshot = ledger.snapshot(actor_role="independent-reviewer")
+            passed = (
+                snapshot.get("eval-batch-a") == "succeeded"
+                and snapshot.get("eval-batch-b") == "failed"
+            )
+        probes.append({"id": "shared_batch_deadline", "passed": passed})
+    finally:
+        triage_module._route = original_route
+        ledger.close_and_delete(actor_id=OWNER)
+
+    oversized = [
+        {**authorized_event, "id": f"eval-oversized-{index:02}"}
+        for index in range(26)
+    ]
+    ledger = DurableLedger()
+    telemetry = TelemetrySink()
+    try:
+        try:
+            triage_batch(
+                oversized,
+                context=context(),
+                authorization_policy=policy_for(oversized),
+                ledger=ledger,
+                telemetry=telemetry,
+                kill_switch=KillSwitch(owner_id=OWNER),
+                evaluation_time=NOW,
+            )
+            passed = False
+        except PolicyError as exc:
+            trace = telemetry.events_for(exc.run_id, actor_role="independent-reviewer")
+            passed = bool(
+                exc.run_id
+                and [(row["state"], row["code"]) for row in trace]
+                == [("received", "received"), ("failed", "policy")]
+            )
+        probes.append({"id": "oversized_batch_trace", "passed": passed})
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    ledger = DurableLedger()
+    try:
+        mode, _, _ = ledger.claim(
+            event_id=authorized_event["id"],
+            fingerprint=_fingerprint(authorized_event),
+            run_id="reconcile-evaluation-owner",
+            deadline=time.monotonic() + 1,
+        )
+        assert mode == "owner"
+        ledger.abort(
+            authorized_event["id"],
+            "failed",
+            run_id="reconcile-evaluation-owner",
+        )
+        denied = mismatched = False
+        try:
+            ledger.reconcile(
+                authorized_event["id"],
+                actor_id="not-owner",
+                expected_fingerprint=_fingerprint(authorized_event),
+                expected_terminal_state="failed",
+                reason="forged",
+            )
+        except AuthorizationError:
+            denied = True
+        try:
+            ledger.reconcile(
+                authorized_event["id"],
+                actor_id=OWNER,
+                expected_fingerprint="0" * 64,
+                expected_terminal_state="failed",
+                reason="manufactured",
+            )
+        except PolicyError:
+            mismatched = True
+        ledger.reconcile(
+            authorized_event["id"],
+            actor_id=OWNER,
+            expected_fingerprint=_fingerprint(authorized_event),
+            expected_terminal_state="failed",
+            reason="verified synthetic no-side-effect adapter",
+        )
+        passed = (
+            denied
+            and mismatched
+            and ledger.snapshot(actor_role="independent-reviewer").get(
+                authorized_event["id"]
+            ) == "reconciled"
+        )
+        probes.append(
+            {"id": "authorized_evidence_bound_reconciliation", "passed": passed}
+        )
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    unicode_event = {
+        **authorized_event,
+        "id": "eval-unicode",
+        "subject": "Café ☕ invoice question",
+    }
+    ledger = DurableLedger()
+    try:
+        result = triage_one(
+            unicode_event,
+            context=context(),
+            authorization_policy=policy_for([unicode_event]),
+            ledger=ledger,
+            telemetry=TelemetrySink(),
+            kill_switch=KillSwitch(owner_id=OWNER),
+            evaluation_time=NOW,
+        )
+        span = next(item for item in result.evidence if item.field == "subject")
+        source_bytes = unicode_event["subject"].encode("utf-8")
+        passed = (
+            source_bytes[span.start:span.end].decode("utf-8").casefold() == "invoice"
+            and span.start != unicode_event["subject"].casefold().index("invoice")
+        )
+        probes.append({"id": "utf8_byte_offsets", "passed": passed})
+    finally:
+        ledger.close_and_delete(actor_id=OWNER)
+
+    ledger = DurableLedger()
+    try:
+        triage_one(
+            authorized_event,
+            context=context(),
+            authorization_policy=policy,
+            ledger=ledger,
+            telemetry=TelemetrySink(),
+            kill_switch=KillSwitch(owner_id=OWNER),
+            evaluation_time=NOW,
+        )
+        changed = {**authorized_event, "body": authorized_event["body"] + " "}
+        try:
+            triage_one(
+                changed,
+                context=context(),
+                authorization_policy=policy,
+                ledger=ledger,
+                telemetry=TelemetrySink(),
+                kill_switch=KillSwitch(owner_id=OWNER),
+                evaluation_time=NOW,
+            )
+            passed = False
+        except ConflictError:
+            passed = True
+        probes.append({"id": "exact_payload_identity", "passed": passed})
     finally:
         ledger.close_and_delete(actor_id=OWNER)
 

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import sqlite3
@@ -182,7 +183,7 @@ class TelemetrySink:
         self._events: list[TelemetryEvent] = []
         self._sequence = 0
 
-    def emit(self, event: TelemetryEvent) -> None:
+    def _validate_event(self, event: TelemetryEvent) -> None:
         if not self.available:
             raise TelemetryUnavailableError(
                 "telemetry unavailable; run stopped in visible degraded mode"
@@ -190,9 +191,37 @@ class TelemetrySink:
         serialized = repr(asdict(event)).casefold()
         if any(field in serialized for field in ("password=", "token=", "secret=")):
             raise PolicyError("telemetry redaction invariant failed")
+
+    def emit(self, event: TelemetryEvent) -> None:
+        self._validate_event(event)
         with self._lock:
             self._sequence += 1
             self._events.append(replace(event, sequence=self._sequence))
+
+    def publish_with_terminal_events(
+        self,
+        events: tuple[TelemetryEvent, ...],
+        *,
+        publish: Callable[[], None],
+    ) -> None:
+        """Make terminal events visible only after durable publication succeeds.
+
+        Validation and availability checks happen before the publication callback.
+        Once the callback returns, appending already-validated in-memory events is
+        deliberately non-fallible and occurs while the sink lock is still held.
+        """
+        for event in events:
+            self._validate_event(event)
+        with self._lock:
+            # Recheck availability after acquiring the publication lock.
+            if not self.available:
+                raise TelemetryUnavailableError(
+                    "telemetry unavailable; run stopped in visible degraded mode"
+                )
+            publish()
+            for event in events:
+                self._sequence += 1
+                self._events.append(replace(event, sequence=self._sequence))
 
     def events_for(self, run_id: str, *, actor_role: str) -> list[dict[str, Any]]:
         self._authorize_reader(actor_role)
@@ -509,10 +538,24 @@ class DurableLedger:
                 )
             connection.commit()
 
-    def finalize(self, event_id: str, *, run_id: str, terminal_state: str) -> None:
-        """Publish a staged result after the final deadline/stop fence passes."""
+    def finalize(
+        self,
+        event_id: str,
+        *,
+        run_id: str,
+        terminal_state: str,
+        deadline: float,
+        step_deadline: float,
+    ) -> None:
+        """Publish a staged result only while both global and step clocks remain valid."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            if time.monotonic() > min(deadline, step_deadline):
+                connection.rollback()
+                raise DeadlineExceededError(
+                    "deadline exceeded before durable finalization",
+                    run_id=run_id,
+                )
             cursor = connection.execute(
                 """
                 UPDATE triage_ledger
@@ -526,6 +569,12 @@ class DurableLedger:
                 connection.rollback()
                 raise ConflictError(
                     "ledger finalization lost its fenced ownership",
+                    run_id=run_id,
+                )
+            if time.monotonic() > min(deadline, step_deadline):
+                connection.rollback()
+                raise DeadlineExceededError(
+                    "deadline exceeded during durable finalization",
                     run_id=run_id,
                 )
             connection.commit()
@@ -570,18 +619,43 @@ class DurableLedger:
             )
             connection.commit()
 
-    def reconcile(self, event_id: str) -> None:
+    def reconcile(
+        self,
+        event_id: str,
+        *,
+        actor_id: str,
+        expected_fingerprint: str,
+        expected_terminal_state: str,
+        reason: str,
+    ) -> None:
+        """Owner-authorized compare-and-set reconciliation of an observed terminal row."""
+        self._require_owner(actor_id)
+        if expected_terminal_state not in {"failed", "cancelled", "succeeded"}:
+            raise PolicyError("reconciliation requires an observed terminal state")
+        if not isinstance(reason, str) or not reason.strip():
+            raise PolicyError("reconciliation requires a non-empty reason")
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             cursor = connection.execute(
                 """
                 UPDATE triage_ledger SET state = 'reconciled', updated_at = ?
                 WHERE event_id = ? AND owner_run_id IS NULL
-                  AND state IN ('failed', 'cancelled', 'succeeded')
+                  AND state = ? AND fingerprint = ?
+                  AND (state = 'succeeded' OR failures > 0)
                 """,
-                (_utc_now_text(), event_id),
+                (
+                    _utc_now_text(),
+                    event_id,
+                    expected_terminal_state,
+                    expected_fingerprint,
+                ),
             )
             if cursor.rowcount != 1:
-                raise PolicyError("only finalized terminal ledger entries can be reconciled")
+                connection.rollback()
+                raise PolicyError(
+                    "reconciliation evidence does not match a finalized terminal ledger entry"
+                )
+            connection.commit()
 
     def has_unreconciled_entries(self) -> bool:
         with self._connect() as connection:
@@ -651,23 +725,24 @@ class _RunTrace:
         self.state = "received"
         self.emit("transition", "received")
 
-    def emit(self, kind: str, code: str, **details: Any) -> None:
-        self.telemetry.emit(
-            TelemetryEvent(
-                sequence=0,
-                run_id=self.run_id,
-                correlation_id=self.correlation_id,
-                event_id=self.event_id,
-                requester_id=self.context.requester_id,
-                operator_id=self.context.operator_id,
-                kind=kind,
-                state=self.state,
-                code=code,
-                timestamp=_utc_now_text(),
-                policy_version=self.context.policy_version,
-                **details,
-            )
+    def _event(self, kind: str, state: str, code: str, **details: Any) -> TelemetryEvent:
+        return TelemetryEvent(
+            sequence=0,
+            run_id=self.run_id,
+            correlation_id=self.correlation_id,
+            event_id=self.event_id,
+            requester_id=self.context.requester_id,
+            operator_id=self.context.operator_id,
+            kind=kind,
+            state=state,
+            code=code,
+            timestamp=_utc_now_text(),
+            policy_version=self.context.policy_version,
+            **details,
         )
+
+    def emit(self, kind: str, code: str, **details: Any) -> None:
+        self.telemetry.emit(self._event(kind, self.state, code, **details))
 
     def transition(self, state: str, code: str = "ok") -> None:
         if state not in WORKFLOW_STATES:
@@ -740,18 +815,21 @@ def _validate_event(event: dict[str, Any], *, evaluation_time: datetime) -> date
 
 
 def _fingerprint(event: dict[str, Any]) -> str:
-    semantic = "\x1f".join(
-        event[field].strip()
-        for field in (
-            "received_at",
-            "source",
-            "source_version",
-            "subject",
-            "body",
-            "reporter",
-        )
+    """Hash exact validated source bytes; whitespace changes are content changes."""
+    fields = (
+        "received_at",
+        "source",
+        "source_version",
+        "subject",
+        "body",
+        "reporter",
     )
-    return hashlib.sha256(semantic.encode()).hexdigest()
+    exact = json.dumps(
+        [event[field] for field in fields],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(exact).hexdigest()
 
 
 def _idempotency_key(event_id: str) -> str:
@@ -763,13 +841,14 @@ def _span(event: dict[str, Any], field: str, term: str) -> EvidenceSpan:
     match = re.search(rf"\b{re.escape(term)}\b", text, flags=re.IGNORECASE)
     if match is None:
         raise PolicyError("internal grounding span mismatch")
+    matched_bytes = match.group(0).encode("utf-8")
     return EvidenceSpan(
         source=event["source"],
         source_version=event["source_version"],
         field=field,
-        start=match.start(),
-        end=match.end(),
-        text_sha256=hashlib.sha256(match.group(0).encode()).hexdigest(),
+        start=len(text[: match.start()].encode("utf-8")),
+        end=len(text[: match.end()].encode("utf-8")),
+        text_sha256=hashlib.sha256(matched_bytes).hexdigest(),
     )
 
 
@@ -796,6 +875,23 @@ def _route(
     return route, tuple(f"matched:{word}" for word, _ in hits), confidence, spans, False
 
 
+
+def _validate_runtime_seconds(value: float, *, run_id: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise PolicyError("maximum runtime must be numeric", run_id=run_id)
+    seconds = float(value)
+    if not math.isfinite(seconds):
+        raise PolicyError("maximum runtime must be finite", run_id=run_id)
+    if seconds <= 0:
+        raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
+    if seconds > MAX_RUNTIME_SECONDS:
+        raise PolicyError(
+            f"maximum runtime cannot exceed {MAX_RUNTIME_SECONDS:g} seconds",
+            run_id=run_id,
+        )
+    return seconds
+
+
 def triage_one(
     event: dict[str, Any],
     *,
@@ -808,6 +904,7 @@ def triage_one(
     evaluation_time: datetime = DEFAULT_EVALUATION_TIME,
     max_runtime_seconds: float = MAX_RUNTIME_SECONDS,
     step_hook: Callable[[str], None] | None = None,
+    _absolute_deadline: float | None = None,
 ) -> TriageResult:
     run_id = str(uuid4())
     correlation_id = str(uuid4())
@@ -853,18 +950,13 @@ def triage_one(
             event_id=event_id,
             context=context,
         )
-        if not isinstance(max_runtime_seconds, (int, float)) or isinstance(
-            max_runtime_seconds, bool
-        ):
-            raise PolicyError("maximum runtime must be numeric", run_id=run_id)
-        if max_runtime_seconds <= 0:
-            raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
-        if max_runtime_seconds > MAX_RUNTIME_SECONDS:
-            raise PolicyError(
-                f"maximum runtime cannot exceed {MAX_RUNTIME_SECONDS:g} seconds",
-                run_id=run_id,
-            )
-        deadline = time.monotonic() + max_runtime_seconds
+        runtime_seconds = _validate_runtime_seconds(max_runtime_seconds, run_id=run_id)
+        local_deadline = time.monotonic() + runtime_seconds
+        deadline = (
+            local_deadline
+            if _absolute_deadline is None
+            else min(local_deadline, _absolute_deadline)
+        )
         fence("received")
 
         step_started = time.monotonic()
@@ -1015,33 +1107,53 @@ def triage_one(
         # This post-completion fence is intentional: a stop/deadline arriving while
         # SQLite completion is blocked converts the staged outcome to cancelled/failed.
         fence("completed", step_started=step_started, step="record-draft")
+        # Validate terminal telemetry before publication, then publish the ledger
+        # and expose its terminal events as one sink-locked operation. A failed ledger
+        # commit exposes no success event; a telemetry failure publishes no result.
+        terminal_events = (
+            trace._event(
+                "outcome",
+                trace.state,
+                "draft_recorded",
+                owner_run_id=run_id,
+                suggested_route=result.suggested_route,
+                outcome_status=result.status,
+                terminal_state=terminal_state,
+                reason_codes=result.reason_codes,
+                evidence_count=len(result.evidence),
+                confidence=result.confidence,
+                abstained=result.abstained,
+                sensitive_case=result.sensitive_case,
+                duplicate=False,
+            ),
+            trace._event("transition", "succeeded", "ok"),
+        )
+        if recovered:
+            terminal_events = (
+                *terminal_events,
+                trace._event(
+                    "transition",
+                    "reconciled",
+                    "recovery_verified",
+                ),
+            )
+        fence("finalizing", step_started=step_started, step="record-draft")
         kill_switch.finalize_if_unchanged(
             run_id=run_id,
             expected_generation=switch_generation,
-            finalize=lambda: ledger.finalize(
-                event["id"],
-                run_id=run_id,
-                terminal_state=terminal_state,
+            finalize=lambda: telemetry.publish_with_terminal_events(
+                terminal_events,
+                publish=lambda: ledger.finalize(
+                    event["id"],
+                    run_id=run_id,
+                    terminal_state=terminal_state,
+                    deadline=deadline,
+                    step_deadline=step_started
+                    + STEP_TIMEOUT_SECONDS["record-draft"],
+                ),
             ),
         )
-
-        trace.emit(
-            "outcome",
-            "draft_recorded",
-            owner_run_id=run_id,
-            suggested_route=result.suggested_route,
-            outcome_status=result.status,
-            terminal_state=terminal_state,
-            reason_codes=result.reason_codes,
-            evidence_count=len(result.evidence),
-            confidence=result.confidence,
-            abstained=result.abstained,
-            sensitive_case=result.sensitive_case,
-            duplicate=False,
-        )
-        trace.transition("succeeded")
-        if recovered:
-            trace.transition("reconciled", "recovery_verified")
+        trace.state = terminal_state
         return result
     except TriageError as exc:
         if exc.run_id is None:
@@ -1078,11 +1190,42 @@ def triage_batch(
     evaluation_time: datetime = DEFAULT_EVALUATION_TIME,
     max_runtime_seconds: float = MAX_RUNTIME_SECONDS,
 ) -> list[dict[str, Any]]:
-    if len(events) > MAX_ITEMS_PER_RUN:
-        raise PolicyError(f"batch exceeds {MAX_ITEMS_PER_RUN} items")
     active_ledger = ledger or DurableLedger()
     active_telemetry = telemetry or TelemetrySink()
     active_switch = kill_switch or KillSwitch(owner_id="Anushrut Gupta")
+    batch_run_id = str(uuid4())
+    batch_trace: _RunTrace | None = None
+
+    try:
+        runtime_seconds = _validate_runtime_seconds(
+            max_runtime_seconds,
+            run_id=batch_run_id,
+        )
+        batch_deadline = time.monotonic() + runtime_seconds
+        if len(events) > MAX_ITEMS_PER_RUN:
+            batch_trace = _RunTrace(
+                telemetry=active_telemetry,
+                run_id=batch_run_id,
+                correlation_id=str(uuid4()),
+                event_id="batch",
+                context=context,
+            )
+            raise PolicyError(
+                f"batch exceeds {MAX_ITEMS_PER_RUN} items",
+                run_id=batch_run_id,
+            )
+    except TriageError as exc:
+        if batch_trace is None:
+            batch_trace = _RunTrace(
+                telemetry=active_telemetry,
+                run_id=batch_run_id,
+                correlation_id=str(uuid4()),
+                event_id="batch",
+                context=context,
+            )
+        if batch_trace.state == "received":
+            batch_trace.transition("failed", exc.code)
+        raise
 
     # Validate sort keys through triage_one so malformed input receives a run id
     # and governed received -> failed telemetry instead of an untraced KeyError.
@@ -1103,21 +1246,25 @@ def triage_batch(
                 kill_switch=active_switch,
                 evaluation_time=evaluation_time,
                 max_runtime_seconds=max_runtime_seconds,
+                _absolute_deadline=batch_deadline,
             )
             raise AssertionError("unreachable")
         sortable.append((received, item_id, item))
 
     ordered = [item for _, _, item in sorted(sortable, key=lambda row: (row[0], row[1]))]
-    return [
-        triage_one(
-            event,
-            context=context,
-            authorization_policy=authorization_policy,
-            ledger=active_ledger,
-            telemetry=active_telemetry,
-            kill_switch=active_switch,
-            evaluation_time=evaluation_time,
-            max_runtime_seconds=max_runtime_seconds,
-        ).to_dict()
-        for event in ordered
-    ]
+    results: list[dict[str, Any]] = []
+    for event in ordered:
+        results.append(
+            triage_one(
+                event,
+                context=context,
+                authorization_policy=authorization_policy,
+                ledger=active_ledger,
+                telemetry=active_telemetry,
+                kill_switch=active_switch,
+                evaluation_time=evaluation_time,
+                max_runtime_seconds=max_runtime_seconds,
+                _absolute_deadline=batch_deadline,
+            ).to_dict()
+        )
+    return results

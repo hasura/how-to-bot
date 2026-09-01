@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="How to Bot: verified operational playbooks for persistent workplace bots.">
+<title>How to Bot — Operational playbooks for workplace bots</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <a class="brand" href="index.html" aria-label="How to Bot home">
+    <span class="brand-mark" aria-hidden="true">H</span>
+    <span>How to Bot</span>
+  </a>
+  <nav aria-label="Primary">
+    <a href="index.html#library">Library</a>
+    <a href="index.html#standard">Standard</a>
+    <a href="https://github.com/hasura/how-to-bot">GitHub</a>
+  </nav>
+</header>
+<main id="main">
+
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow">The open operating manual for persistent workplace bots</p>
+    <h1>Teach a bot to own an outcome—not just run a prompt.</h1>
+    <p class="lede">Verified playbooks for delegating bounded, observable work. Every tutorial
+    specifies permissions, evidence, approvals, state, tests, recovery, and a stop path.</p>
+    <div class="hero-actions">
+      <a class="button primary" href="#library">Explore the library</a>
+      <a class="button secondary" href="https://github.com/hasura/how-to-bot">View the standard</a>
+    </div>
+  </div>
+  <aside class="operating-model" aria-label="Operating model">
+    <p class="eyebrow">The recurring contract</p>
+    <ol>
+      <li><span>01</span> Authorized trigger</li>
+      <li><span>02</span> Approved sources + provenance</li>
+      <li><span>03</span> Bounded output or transaction</li>
+      <li><span>04</span> Human or deterministic gate</li>
+      <li><span>05</span> Exception routing</li>
+      <li><span>06</span> Measurement + feedback</li>
+    </ol>
+  </aside>
+</section>
+<section class="notice" aria-label="Repository status">
+  <strong>Foundation first cut</strong>
+  <span>Runnable with synthetic data. Author-side checks pass; independent v0.4 review is still required before publication claims.</span>
+</section>
+<section class="framework" id="standard">
+  <div>
+    <p class="eyebrow">One library, three ways in</p>
+    <h2>Find the right delegation from where you stand.</h2>
+  </div>
+  <div class="framework-grid">
+    <article><span class="number">Who</span><h3>Role</h3><p>The person or team handing off responsibility.</p></article>
+    <article><span class="number">What</span><h3>Playbook</h3><p>The concrete job and bounded outcome the bot owns.</p></article>
+    <article><span class="number">How</span><h3>Pattern</h3><p>The reusable operational mechanism underneath the job.</p></article>
+  </div>
+  <div class="ownership-grid">
+    <article><span class="mode maintain">MAINTAIN</span><h3>Ongoing control loop</h3><p>Keep an owned object within a defined healthy condition.</p></article>
+    <article><span class="mode complete">COMPLETE</span><h3>Bounded mission</h3><p>Reach a verifiable done condition, then stop.</p></article>
+  </div>
+</section>
+
+<section class="library" id="library">
+  <div class="library-heading">
+    <div><p class="eyebrow">Canonical tutorial library</p><h2>Browse verified operating contracts.</h2></div>
+    <div class="view-switcher" role="group" aria-label="Browse library by">
+      <button class="active" type="button" data-view="playbooks" aria-pressed="true">Playbook</button>
+      <button type="button" data-view="roles" aria-pressed="false">Role</button>
+      <button type="button" data-view="patterns" aria-pressed="false">Pattern</button>
+    </div>
+  </div>
+  <div data-kind="playbooks">
+<section class="catalog-group" id="playbook-inbound-triage">
+  <div class="group-heading">
+    <p class="eyebrow">Playbook</p>
+    <h3>inbound triage</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="playbook-private-draft-routing">
+  <div class="group-heading">
+    <p class="eyebrow">Playbook</p>
+    <h3>private draft routing</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+</div>
+  <div data-kind="roles" hidden>
+<section class="catalog-group" id="role-finance-operator">
+  <div class="group-heading">
+    <p class="eyebrow">Role</p>
+    <h3>finance operator</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="role-operations-operator">
+  <div class="group-heading">
+    <p class="eyebrow">Role</p>
+    <h3>operations operator</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="role-recruiting-operator">
+  <div class="group-heading">
+    <p class="eyebrow">Role</p>
+    <h3>recruiting operator</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="role-support-operator">
+  <div class="group-heading">
+    <p class="eyebrow">Role</p>
+    <h3>support operator</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+</div>
+  <div data-kind="patterns" hidden>
+<section class="catalog-group" id="pattern-authorize---validate---plan---draft---human-disposition">
+  <div class="group-heading">
+    <p class="eyebrow">Pattern</p>
+    <h3>authorize → validate → plan → draft → human disposition</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="pattern-bounded-execution-with-kill-switch">
+  <div class="group-heading">
+    <p class="eyebrow">Pattern</p>
+    <h3>bounded execution with kill switch</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="pattern-durable-idempotency-and-replay">
+  <div class="group-heading">
+    <p class="eyebrow">Pattern</p>
+    <h3>durable idempotency and replay</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+
+<section class="catalog-group" id="pattern-evidence-grounded-abstention-and-escalation">
+  <div class="group-heading">
+    <p class="eyebrow">Pattern</p>
+    <h3>evidence-grounded abstention and escalation</h3>
+    <span>1 playbook</span>
+  </div>
+  <div class="card-grid">
+<article class="tutorial-card">
+  <div class="card-meta">
+    <span class="mode complete">COMPLETE</span>
+    <span class="risk">T1</span>
+    <span class="status">Needs Retest</span>
+  </div>
+  <h3><a href="tutorials/inbound-triage.html">Inbound triage with suggested resolution and routing</a></h3>
+  <p>Produce one authorized, evidence-grounded private triage draft without taking the final disposition.</p>
+  <dl class="compact">
+    <div><dt>Owns</dt><dd>one versioned inbound event and its private draft disposition</dd></div>
+    <div><dt>Done when</dt><dd>The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.</dd></div>
+  </dl>
+  <div class="card-chips"><span class="chip pattern">authorize → validate → plan → draft → human disposition</span><span class="chip pattern">durable idempotency and replay</span></div>
+  <a class="card-action" href="tutorials/inbound-triage.html">Open playbook <span aria-hidden="true">→</span></a>
+</article>
+</div>
+</section>
+</div>
+</section>
+<section class="progressive">
+  <p class="eyebrow">Progressive disclosure</p>
+  <h2>Start small. Earn the right to operate.</h2>
+  <div class="steps">
+    <article><span>1</span><h3>Try it</h3><p>Run a bounded example with synthetic fixtures and inspect the result.</p></article>
+    <article><span>2</span><h3>Run it repeatedly</h3><p>Prove behavior across replay, failure, recovery, and evaluation.</p></article>
+    <article><span>3</span><h3>Operate it safely</h3><p>Understand permission, approval, monitoring, escalation, and stop boundaries.</p></article>
+  </div>
+</section>
+
+</main>
+<footer>
+  <p><strong>How to Bot</strong> · Open operational playbooks, not prompt snippets.</p>
+  <p>Apache-2.0 · <a href="https://github.com/hasura/how-to-bot">Source and contribution guide</a></p>
+</footer>
+<script>
+for (const button of document.querySelectorAll('[data-view]')) {
+  button.addEventListener('click', () => {
+    const view = button.dataset.view;
+    document.querySelectorAll('[data-view]').forEach(item => {
+      item.classList.toggle('active', item === button);
+      item.setAttribute('aria-pressed', String(item === button));
+    });
+    document.querySelectorAll('[data-kind]').forEach(section => {
+      section.hidden = section.dataset.kind !== view;
+    });
+  });
+}
+</script>
+</body>
+</html>

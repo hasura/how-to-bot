@@ -1,43 +1,65 @@
 tutorial_id: inbound-triage
 claims:
-  - id: HTB-1
-    text: The 0.3.0 local-python adapter is designed to produce private draft route suggestions without network calls, external destinations, or external writes.
-    label: documented
-    source: local-python adapter 0.3.0 source and canonical tests
-    scope: inbound-triage 0.3.0 with synthetic fixture set inbound-triage-eval-v3
-    evidence: [tests/test_repository.py, tutorials/inbound-triage/test_conformance.py, tutorials/inbound-triage/evaluate.py]
-    date: "2026-09-01"
-    procedure: Run the complete frozen gate and obtain a fresh independent review before changing this label to demonstrated.
-    limitations: Author-side results do not establish independent reproduction, production safety, or live-source compatibility.
-  - id: HTB-2
-    text: The file-backed SQLite DurableLedger is designed to yield one finalized semantic outcome across serial, concurrent, and owner-recovery races on one shared local filesystem.
-    label: documented
-    source: DurableLedger owner_run_id fencing, staged finalization, and adversarial tests
-    scope: inbound-triage 0.3.0 local cross-process and restart recovery; not multi-host or distributed
-    evidence:
-      - tutorials/inbound-triage/test_failure_injection.py::test_concurrent_exact_replay_is_atomic
-      - tutorials/inbound-triage/test_failure_injection.py::test_same_event_identity_changed_content_is_conflict
-      - tutorials/inbound-triage/test_failure_injection.py::test_durable_interrupted_claim_recovers_after_adapter_restart
-      - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner
-      - tutorials/inbound-triage/evaluate.py
-    date: "2026-09-01"
-    procedure: Run serial, concurrent, conflict, restart, stale-owner, repeated-error, and six-probe evaluation cases; require 6/6 attacks and zero duplicate-semantic-outcome failures.
-    limitations: Requires cooperating processes and one shared local SQLite filesystem; no distributed-idempotency claim is made; independent v0.3.0 reproduction is pending.
-  - id: HTB-3
-    text: The v3 frozen synthetic evaluation requires routes 3/3, abstentions 2/2, grounding 3/3, exceptions 2/2, all nine critical invariants at zero failures, and all six independent attacks to pass.
-    label: documented
-    source: predeclared evaluation contract and executable evaluator
-    scope: inbound-triage-eval-v3 frozen before the v0.3.0 validation run
-    evidence: [tutorials/inbound-triage/evaluation.yaml, tutorials/inbound-triage/fixtures/evaluation.json, tutorials/inbound-triage/evaluate.py]
-    date: "2026-09-01"
-    procedure: Run evaluate.py and inspect every raw numerator/denominator, nine invariant failure counts, and the 6/6 adversarial summary.
-    limitations: A passing small synthetic set is not a production accuracy, reliability, safety, or portability claim; independent v0.3.0 reproduction is pending.
-  - id: HTB-4
-    text: Sensitive synthetic cases are designed to transfer visibly to security while final disposition remains assigned to Anushrut Gupta and unavailable to this adapter.
-    label: documented
-    source: local-python adapter 0.3.0 conformance and capability tests
-    scope: inbound-triage 0.3.0 synthetic fixtures
-    evidence: [tutorials/inbound-triage/test_conformance.py::test_sensitive_case_escalates_to_named_human, tests/test_repository.py::test_pilot_has_no_side_effects_and_is_draft]
-    date: "2026-09-01"
-    procedure: Run the named tests and inspect owner, draft flag, escalation code, and absent effect capabilities; obtain independent review before changing this label.
-    limitations: Keyword escalation is illustrative and can miss semantic nuance; independent v0.3.0 reproduction is pending.
+- id: HTB-1
+  text: The 0.4.0 local-python adapter is designed to produce private draft route suggestions without network calls, external destinations, or external writes.
+  label: documented
+  source: local-python adapter 0.4.0 source and canonical tests
+  scope: inbound-triage 0.4.0 with synthetic fixture set inbound-triage-eval-v4
+  evidence:
+  - tests/test_repository.py
+  - tutorials/inbound-triage/test_conformance.py
+  - tutorials/inbound-triage/evaluate.py
+  date: '2026-09-01'
+  procedure: Run the complete gate and obtain a fresh independent review before changing this label to demonstrated.
+  limitations: Author-side results do not establish independent reproduction, production safety, or live-source compatibility.
+- id: HTB-2
+  text: The file-backed SQLite DurableLedger is designed to yield one finalized semantic outcome across serial, concurrent, exact-payload, and owner-recovery races on one shared local filesystem.
+  label: documented
+  source: DurableLedger exact-byte identity, owner_run_id fencing, staged finalization, and adversarial tests
+  scope: inbound-triage 0.4.0 local cross-process and restart recovery; not multi-host or distributed
+  evidence:
+  - tutorials/inbound-triage/test_failure_injection.py::test_concurrent_exact_replay_is_atomic
+  - tutorials/inbound-triage/test_failure_injection.py::test_same_event_identity_changed_content_is_conflict
+  - tutorials/inbound-triage/test_failure_injection.py::test_third_review_whitespace_changed_payload_is_conflict
+  - tutorials/inbound-triage/test_failure_injection.py::test_durable_interrupted_claim_recovers_after_adapter_restart
+  - tutorials/inbound-triage/test_failure_injection.py::test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner
+  - tutorials/inbound-triage/evaluate.py
+  date: '2026-09-01'
+  procedure: Run serial, concurrent, conflict, restart, stale-owner, repeated-error, and 14-probe evaluation cases; require 14/14 attacks and zero duplicate-semantic-outcome failures.
+  limitations: Requires cooperating processes and one shared local SQLite filesystem; no distributed-idempotency claim is made; independent v0.4.0 reproduction is pending.
+- id: HTB-3
+  text: The v4 frozen synthetic evaluation requires routes 3/3, abstentions 2/2, grounding 3/3, exceptions 2/2, all nine critical invariants at zero failures, and all 14 adversarial probes to pass.
+  label: documented
+  source: predeclared evaluation contract and executable evaluator
+  scope: inbound-triage-eval-v4 frozen before the v0.4.0 validation run
+  evidence:
+  - tutorials/inbound-triage/evaluation.yaml
+  - tutorials/inbound-triage/fixtures/evaluation.json
+  - tutorials/inbound-triage/evaluate.py
+  date: '2026-09-01'
+  procedure: Run evaluate.py and inspect every raw numerator/denominator, nine invariant failure counts, and the 14/14 adversarial summary.
+  limitations: A passing small synthetic set is not a production accuracy, reliability, safety, or portability claim; independent v0.4.0 reproduction is pending.
+- id: HTB-4
+  text: Sensitive synthetic cases are designed to transfer visibly to security while final disposition remains assigned to Anushrut Gupta and unavailable to this adapter.
+  label: documented
+  source: local-python adapter 0.4.0 conformance and capability tests
+  scope: inbound-triage 0.4.0 synthetic fixtures
+  evidence:
+  - tutorials/inbound-triage/test_conformance.py::test_sensitive_case_escalates_to_named_human
+  - tests/test_repository.py::test_pilot_has_no_side_effects_and_is_draft
+  date: '2026-09-01'
+  procedure: Run the named tests and inspect owner, draft flag, escalation code, and absent effect capabilities; obtain independent review before changing this label.
+  limitations: Keyword escalation is illustrative and can miss semantic nuance; independent v0.4.0 reproduction is pending.
+- id: HTB-5
+  text: The generated catalog is designed to project canonical role, playbook, pattern, ownership, and progressive-stage fields without hand-maintained tutorial copy.
+  label: documented
+  source: tutorial schema, deterministic site generator, and site tests
+  scope: repository static site generated from validated v0.4.0 tutorial manifests
+  evidence:
+  - schemas/tutorial.schema.json
+  - tools/build_site.py
+  - tests/test_site.py
+  - site/dist/catalog.json
+  date: '2026-09-01'
+  procedure: Run tools/validate.py, build_site.py --check, and tests/test_site.py; compare generated catalog fields with tutorial.yaml.
+  limitations: A generated first cut does not establish usability, accessibility conformance, discoverability at scale, hosting, or public launch approval.

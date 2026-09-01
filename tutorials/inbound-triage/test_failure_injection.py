@@ -22,6 +22,7 @@ from howtobot.inbound_triage import (
     TelemetryUnavailableError,
     ValidationError,
     WORKFLOW_STATES,
+    _fingerprint,
     triage_batch,
     triage_one,
 )
@@ -251,7 +252,13 @@ def test_idle_and_midrun_kill_switch_and_controlled_resume():
             future.result()
     assert state2[2].snapshot(actor_role="independent-reviewer")[midrun["id"]] == "cancelled"
     assert [row["action"] for row in state2[4].audit_log()] == ["activated"]
-    state2[2].reconcile(midrun["id"])
+    state2[2].reconcile(
+        midrun["id"],
+        actor_id="Anushrut Gupta",
+        expected_fingerprint=_fingerprint(midrun),
+        expected_terminal_state="cancelled",
+        reason="verified no external side effects in the T1 adapter",
+    )
     state2[4].resume(actor_id="Anushrut Gupta", reconciled=True, reason="run reconciled", ledger=state2[2])
     recovered = invoke(midrun, state2)
     assert recovered.terminal_state == "reconciled"
@@ -394,12 +401,7 @@ def test_durable_interrupted_claim_recovers_after_adapter_restart(tmp_path):
     state = runtime([item])
     ledger_path = tmp_path / "ledger.sqlite3"
     first_process = DurableLedger(ledger_path)
-    fingerprint = __import__("hashlib").sha256(
-        "\x1f".join(
-            item[field].strip()
-            for field in ("received_at", "source", "source_version", "subject", "body", "reporter")
-        ).encode()
-    ).hexdigest()
+    fingerprint = _fingerprint(item)
     mode, _, _ = first_process.claim(
         event_id=item["id"],
         fingerprint=fingerprint,
@@ -445,7 +447,7 @@ def test_ledger_retention_is_owner_enforced():
     assert state[2].snapshot(actor_role="independent-reviewer") == {}
 
 
-# Canonicalized from the second independent Gate 2 review. These attacks must remain.
+# Canonicalized from the second independent review. These attacks must remain.
 def test_reviewer_probe_rejects_iso_basic_timestamp():
     item = {**event("evt-basic-time"), "received_at": "20260901T190000+00:00"}
     with pytest.raises(ValidationError):
@@ -470,12 +472,7 @@ def test_reviewer_probe_resume_requires_ledger_verified_reconciliation():
     state = runtime([item])
     ledger = state[2]
     switch = state[4]
-    fingerprint = __import__("hashlib").sha256(
-        "\x1f".join(
-            item[field].strip()
-            for field in ("received_at", "source", "source_version", "subject", "body", "reporter")
-        ).encode()
-    ).hexdigest()
+    fingerprint = _fingerprint(item)
     mode, _, _ = ledger.claim(
         event_id=item["id"],
         fingerprint=fingerprint,
@@ -659,6 +656,188 @@ def test_staged_result_is_not_replay_visible_before_finalization():
         results = [owner.result(timeout=2), replay.result(timeout=2)]
 
     assert sorted(result.duplicate for result in results) == [False, True]
+    assert state[2].snapshot(actor_role="independent-reviewer") == {
+        item["id"]: "succeeded"
+    }
+
+
+# Canonicalized from the third independent review. These eight attacks must remain.
+@pytest.mark.parametrize("runtime", [float("nan"), float("inf"), float("-inf")])
+def test_third_review_non_finite_runtime_fails_closed(runtime):
+    item = event(f"evt-non-finite-{repr(runtime)}".replace(".", "-"))
+    state = runtime_state = globals()["runtime"]([item])
+    with pytest.raises(PolicyError) as exc:
+        invoke(item, runtime_state, max_runtime_seconds=runtime)
+    trace = state[3].events_for(exc.value.run_id, actor_role="independent-reviewer")
+    assert [row["state"] for row in trace] == ["received", "failed"]
+    assert trace[-1]["code"] == "policy"
+    assert state[2].snapshot(actor_role="independent-reviewer") == {}
+
+
+def test_third_review_finalization_obeys_step_and_global_deadlines(monkeypatch):
+    item = event("evt-finalization-deadline")
+    state = runtime([item])
+    original_finalize = state[2].finalize
+    monkeypatch.setitem(STEP_TIMEOUT_SECONDS, "record-draft", 0.01)
+
+    def delayed_finalize(*args, **kwargs):
+        time.sleep(0.02)
+        return original_finalize(*args, **kwargs)
+
+    state[2].finalize = delayed_finalize
+    with pytest.raises(DeadlineExceededError):
+        invoke(item, state, max_runtime_seconds=0.05)
+    assert state[2].snapshot(actor_role="independent-reviewer") == {
+        item["id"]: "failed"
+    }
+    trace = state[3].all_events(actor_role="independent-reviewer")
+    assert not any(row["state"] == "succeeded" for row in trace)
+
+
+def test_third_review_telemetry_failure_cannot_follow_durable_publication():
+    class FailTerminalOnce(TelemetrySink):
+        def __init__(self):
+            super().__init__()
+            self.failed = False
+
+        def publish_with_terminal_events(self, events, *, publish):
+            if not self.failed:
+                self.failed = True
+                raise TelemetryUnavailableError("synthetic terminal telemetry outage")
+            return super().publish_with_terminal_events(events, publish=publish)
+
+    item = event("evt-terminal-telemetry-loss")
+    context, policy, ledger, _, switch = runtime([item])
+    telemetry = FailTerminalOnce()
+    with pytest.raises(TelemetryUnavailableError) as exc:
+        triage_one(
+            item,
+            context=context,
+            authorization_policy=policy,
+            ledger=ledger,
+            telemetry=telemetry,
+            kill_switch=switch,
+            evaluation_time=NOW,
+        )
+    assert ledger.snapshot(actor_role="independent-reviewer") == {item["id"]: "failed"}
+    trace = telemetry.events_for(exc.value.run_id, actor_role="independent-reviewer")
+    assert trace[-1]["state"] == "failed"
+    assert not any(row["state"] == "succeeded" for row in trace)
+
+
+def test_third_review_batch_uses_one_absolute_deadline(monkeypatch):
+    import howtobot.inbound_triage as module
+
+    items = [event("evt-batch-budget-a"), event("evt-batch-budget-b")]
+    context, policy, ledger, telemetry, switch = runtime(items)
+    original_route = module._route
+
+    def slow_route(item):
+        time.sleep(0.018)
+        return original_route(item)
+
+    monkeypatch.setattr(module, "_route", slow_route)
+    with pytest.raises(DeadlineExceededError):
+        triage_batch(
+            items,
+            context=context,
+            authorization_policy=policy,
+            ledger=ledger,
+            telemetry=telemetry,
+            kill_switch=switch,
+            evaluation_time=NOW,
+            max_runtime_seconds=0.03,
+        )
+    snapshot = ledger.snapshot(actor_role="independent-reviewer")
+    assert snapshot["evt-batch-budget-a"] == "succeeded"
+    assert snapshot["evt-batch-budget-b"] == "failed"
+
+
+def test_third_review_oversized_batch_has_run_id_and_terminal_trace():
+    items = [event(f"evt-oversized-{index:02}") for index in range(26)]
+    context, policy, ledger, telemetry, switch = runtime(items)
+    with pytest.raises(PolicyError) as exc:
+        triage_batch(
+            items,
+            context=context,
+            authorization_policy=policy,
+            ledger=ledger,
+            telemetry=telemetry,
+            kill_switch=switch,
+            evaluation_time=NOW,
+        )
+    assert exc.value.run_id
+    trace = telemetry.events_for(exc.value.run_id, actor_role="independent-reviewer")
+    assert [(row["state"], row["code"]) for row in trace] == [
+        ("received", "received"),
+        ("failed", "policy"),
+    ]
+    assert trace[0]["event_id"] == "batch"
+
+
+def test_third_review_reconciliation_is_owner_authorized_and_evidence_bound():
+    item = event("evt-reconciliation-auth")
+    state = runtime([item])
+
+    def fail(stage):
+        if stage == "executing":
+            raise RuntimeError("synthetic interrupted work")
+
+    with pytest.raises(PolicyError):
+        invoke(item, state, step_hook=fail)
+
+    with pytest.raises(AuthorizationError):
+        state[2].reconcile(
+            item["id"],
+            actor_id="not-owner",
+            expected_fingerprint=_fingerprint(item),
+            expected_terminal_state="failed",
+            reason="forged",
+        )
+    with pytest.raises(PolicyError):
+        state[2].reconcile(
+            item["id"],
+            actor_id="Anushrut Gupta",
+            expected_fingerprint="0" * 64,
+            expected_terminal_state="failed",
+            reason="manufactured evidence",
+        )
+    state[2].reconcile(
+        item["id"],
+        actor_id="Anushrut Gupta",
+        expected_fingerprint=_fingerprint(item),
+        expected_terminal_state="failed",
+        reason="verified no external side effects in the T1 adapter",
+    )
+    assert state[2].snapshot(actor_role="independent-reviewer") == {
+        item["id"]: "reconciled"
+    }
+
+
+def test_third_review_evidence_offsets_are_utf8_byte_offsets():
+    item = {
+        **event("evt-unicode-offset"),
+        "subject": "Café ☕ invoice question",
+        "body": "A synthetic charge.",
+    }
+    result = invoke(item, runtime([item]))
+    invoice = next(
+        span for span in result.evidence
+        if span.field == "subject"
+    )
+    raw = item["subject"].encode("utf-8")
+    assert raw[invoice.start:invoice.end].decode("utf-8").casefold() == "invoice"
+    assert invoice.start != item["subject"].casefold().index("invoice")
+
+
+def test_third_review_whitespace_changed_payload_is_conflict():
+    item = event("evt-whitespace-identity")
+    state = runtime([item])
+    first = invoke(item, state)
+    changed = {**item, "body": item["body"] + " "}
+    with pytest.raises(ConflictError):
+        invoke(changed, state)
+    assert first.evidence
     assert state[2].snapshot(actor_role="independent-reviewer") == {
         item["id"]: "succeeded"
     }

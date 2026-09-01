@@ -1,11 +1,11 @@
 tutorial_id: inbound-triage
 adapter_id: local-python
-version: 0.3.0
+version: 0.4.0
 runtime:
   implementation: CPython
   tested_version: 3.14.4
   dependencies:
-  - how-to-bot 0.3.0
+  - how-to-bot 0.4.0
 authentication:
   identity_source: trusted RequestContext supplied by the adapter
   requester: synthetic-user-operator

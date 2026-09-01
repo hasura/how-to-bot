@@ -13,6 +13,9 @@
     "changelog",
     "adapters",
     "tested_versions",
+    "discovery",
+    "ownership",
+    "progression",
     "risk",
     "lifecycle",
     "outcome",
@@ -75,10 +78,23 @@
     "risk": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tier", "rationale", "data_class", "audience", "capabilities", "side_effects"],
+      "required": [
+        "tier",
+        "rationale",
+        "data_class",
+        "audience",
+        "capabilities",
+        "side_effects"
+      ],
       "properties": {
         "tier": {
-          "enum": ["T0", "T1", "T2", "T3", "T4"]
+          "enum": [
+            "T0",
+            "T1",
+            "T2",
+            "T3",
+            "T4"
+          ]
         },
         "rationale": {
           "type": "string",
@@ -95,11 +111,15 @@
         "capabilities": {
           "type": "array",
           "minItems": 1,
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
         "side_effects": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -122,26 +142,71 @@
         "retire_migrate_procedure"
       ],
       "properties": {
-        "maintainer": {"type": "string", "minLength": 3},
-        "domain_owner": {"type": "string", "minLength": 3},
-        "reliability_reviewer": {"type": "string", "minLength": 3},
-        "security_exception_owner": {"type": "string", "minLength": 3},
-        "created": {"type": "string", "format": "date"},
-        "last_verified": {"type": "string", "format": "date"},
-        "next_review": {"type": "string", "format": "date"},
-        "issue_path": {"type": "string", "format": "uri"},
-        "security_report_path": {"type": "string", "format": "uri"},
-        "retest_required": {"type": "boolean"},
-        "retest_reason": {"type": ["string", "null"]},
+        "maintainer": {
+          "type": "string",
+          "minLength": 3
+        },
+        "domain_owner": {
+          "type": "string",
+          "minLength": 3
+        },
+        "reliability_reviewer": {
+          "type": "string",
+          "minLength": 3
+        },
+        "security_exception_owner": {
+          "type": "string",
+          "minLength": 3
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "last_verified": {
+          "type": "string",
+          "format": "date"
+        },
+        "next_review": {
+          "type": "string",
+          "format": "date"
+        },
+        "issue_path": {
+          "type": "string",
+          "format": "uri"
+        },
+        "security_report_path": {
+          "type": "string",
+          "format": "uri"
+        },
+        "retest_required": {
+          "type": "boolean"
+        },
+        "retest_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "material_change_triggers": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": ["permission", "policy", "runtime", "dependency", "model", "adapter", "incident"]
+            "enum": [
+              "permission",
+              "policy",
+              "runtime",
+              "dependency",
+              "model",
+              "adapter",
+              "incident"
+            ]
           }
         },
-        "retire_migrate_procedure": {"type": "string", "minLength": 10}
+        "retire_migrate_procedure": {
+          "type": "string",
+          "minLength": 10
+        }
       }
     },
     "outcome": {
@@ -162,21 +227,46 @@
         "limitations"
       ],
       "properties": {
-        "job": {"type": "string", "minLength": 1},
-        "users": {"$ref": "#/$defs/nonEmptyStrings"},
-        "non_goals": {"$ref": "#/$defs/nonEmptyStrings"},
-        "preconditions": {"$ref": "#/$defs/nonEmptyStrings"},
-        "inputs": {"$ref": "#/$defs/nonEmptyStrings"},
-        "outputs": {"$ref": "#/$defs/nonEmptyStrings"},
+        "job": {
+          "type": "string",
+          "minLength": 1
+        },
+        "users": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "non_goals": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "preconditions": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "inputs": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "outputs": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
         "side_effects": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         },
-        "success_criteria": {"$ref": "#/$defs/nonEmptyStrings"},
-        "unacceptable_outcomes": {"$ref": "#/$defs/nonEmptyStrings"},
-        "assumptions": {"$ref": "#/$defs/nonEmptyStrings"},
-        "affected_parties": {"$ref": "#/$defs/nonEmptyStrings"},
-        "limitations": {"$ref": "#/$defs/nonEmptyStrings"}
+        "success_criteria": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "unacceptable_outcomes": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "assumptions": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "affected_parties": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "limitations": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
       }
     },
     "actors": {
@@ -185,38 +275,98 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "kind", "identity", "responsibility", "trust"],
+        "required": [
+          "id",
+          "kind",
+          "identity",
+          "responsibility",
+          "trust"
+        ],
         "properties": {
-          "id": {"type": "string", "minLength": 1},
-          "kind": {
-            "enum": ["requester", "operator", "approver", "data_owner", "affected_party", "tool", "destination"]
+          "id": {
+            "type": "string",
+            "minLength": 1
           },
-          "identity": {"type": "string", "minLength": 1},
-          "responsibility": {"type": "string", "minLength": 1},
-          "trust": {"enum": ["trusted", "untrusted", "not_applicable"]}
+          "kind": {
+            "enum": [
+              "requester",
+              "operator",
+              "approver",
+              "data_owner",
+              "affected_party",
+              "tool",
+              "destination"
+            ]
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "responsibility": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trust": {
+            "enum": [
+              "trusted",
+              "untrusted",
+              "not_applicable"
+            ]
+          }
         }
       }
     },
     "data_flow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["assets", "classifications", "untrusted_inputs", "tools", "destination", "boundaries"],
+      "required": [
+        "assets",
+        "classifications",
+        "untrusted_inputs",
+        "tools",
+        "destination",
+        "boundaries"
+      ],
       "properties": {
-        "assets": {"$ref": "#/$defs/nonEmptyStrings"},
-        "classifications": {"$ref": "#/$defs/nonEmptyStrings"},
-        "untrusted_inputs": {"$ref": "#/$defs/nonEmptyStrings"},
-        "tools": {"$ref": "#/$defs/nonEmptyStrings"},
-        "destination": {"type": "string", "minLength": 1},
-        "boundaries": {"$ref": "#/$defs/nonEmptyStrings"}
+        "assets": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "classifications": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "untrusted_inputs": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "tools": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundaries": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
       }
     },
     "workflow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["trigger", "termination", "states", "invariants", "steps"],
+      "required": [
+        "trigger",
+        "termination",
+        "states",
+        "invariants",
+        "steps"
+      ],
       "properties": {
-        "trigger": {"type": "string", "minLength": 1},
-        "termination": {"$ref": "#/$defs/nonEmptyStrings"},
+        "trigger": {
+          "type": "string",
+          "minLength": 1
+        },
+        "termination": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
         "states": {
           "type": "array",
           "minItems": 10,
@@ -236,52 +386,128 @@
             ]
           }
         },
-        "invariants": {"$ref": "#/$defs/nonEmptyStrings"},
+        "invariants": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
         "steps": {
           "type": "array",
           "minItems": 1,
-          "items": {"$ref": "#/$defs/step"}
+          "items": {
+            "$ref": "#/$defs/step"
+          }
         }
       }
     },
     "state_governance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["location", "owner", "retention_days", "access", "deletion", "reset", "ordering", "concurrency"],
+      "required": [
+        "location",
+        "owner",
+        "retention_days",
+        "access",
+        "deletion",
+        "reset",
+        "ordering",
+        "concurrency"
+      ],
       "properties": {
-        "location": {"type": "string", "minLength": 1},
-        "owner": {"type": "string", "minLength": 3},
-        "retention_days": {"type": "integer", "minimum": 1},
-        "access": {"$ref": "#/$defs/nonEmptyStrings"},
-        "deletion": {"type": "string", "minLength": 1},
-        "reset": {"type": "string", "minLength": 1},
-        "ordering": {"type": "string", "minLength": 1},
-        "concurrency": {"type": "string", "minLength": 1}
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 3
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "access": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "deletion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "concurrency": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "observability": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["events", "identities", "redaction", "retention_days", "access", "loss_behavior"],
+      "required": [
+        "events",
+        "identities",
+        "redaction",
+        "retention_days",
+        "access",
+        "loss_behavior"
+      ],
       "properties": {
-        "events": {"$ref": "#/$defs/nonEmptyStrings"},
-        "identities": {"$ref": "#/$defs/nonEmptyStrings"},
-        "redaction": {"$ref": "#/$defs/nonEmptyStrings"},
-        "retention_days": {"type": "integer", "minimum": 1},
-        "access": {"$ref": "#/$defs/nonEmptyStrings"},
-        "loss_behavior": {"type": "string", "minLength": 1}
+        "events": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "identities": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "redaction": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "access": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "loss_behavior": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "evaluation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fixture_version", "fixtures", "thresholds", "commands", "critical_invariants"],
+      "required": [
+        "fixture_version",
+        "fixtures",
+        "thresholds",
+        "commands",
+        "critical_invariants"
+      ],
       "properties": {
-        "fixture_version": {"type": "string", "minLength": 1},
-        "fixtures": {"type": "string", "minLength": 1},
-        "thresholds": {"type": "string", "minLength": 1},
-        "commands": {"$ref": "#/$defs/nonEmptyStrings"},
-        "critical_invariants": {"$ref": "#/$defs/nonEmptyStrings"}
+        "fixture_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixtures": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thresholds": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commands": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "critical_invariants": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
       }
     },
     "files": {
@@ -300,16 +526,114 @@
         "failure_matrix"
       ],
       "properties": {
-        "spec": {"type": "string"},
-        "threat_model": {"type": "string"},
-        "runbook": {"type": "string"},
-        "permissions": {"type": "string"},
-        "approvals": {"type": "string"},
-        "claims": {"type": "string"},
-        "evaluation": {"type": "string"},
-        "adapter": {"type": "string"},
-        "changelog": {"type": "string"},
-        "failure_matrix": {"type": "string"}
+        "spec": {
+          "type": "string"
+        },
+        "threat_model": {
+          "type": "string"
+        },
+        "runbook": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "string"
+        },
+        "approvals": {
+          "type": "string"
+        },
+        "claims": {
+          "type": "string"
+        },
+        "evaluation": {
+          "type": "string"
+        },
+        "adapter": {
+          "type": "string"
+        },
+        "changelog": {
+          "type": "string"
+        },
+        "failure_matrix": {
+          "type": "string"
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "roles",
+        "playbooks",
+        "patterns"
+      ],
+      "properties": {
+        "roles": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "playbooks": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "patterns": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "responsibility",
+        "owned_object",
+        "healthy_or_done_condition",
+        "verification_evidence",
+        "stop_approval_escalation_boundary"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "MAINTAIN",
+            "COMPLETE"
+          ]
+        },
+        "responsibility": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owned_object": {
+          "type": "string",
+          "minLength": 1
+        },
+        "healthy_or_done_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification_evidence": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "stop_approval_escalation_boundary": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
+      }
+    },
+    "progression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "try_it",
+        "run_repeatedly",
+        "operate_safely"
+      ],
+      "properties": {
+        "try_it": {
+          "$ref": "#/$defs/stage"
+        },
+        "run_repeatedly": {
+          "$ref": "#/$defs/stage"
+        },
+        "operate_safely": {
+          "$ref": "#/$defs/stage"
+        }
       }
     }
   },
@@ -317,7 +641,10 @@
     "nonEmptyStrings": {
       "type": "array",
       "minItems": 1,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "step": {
       "type": "object",
@@ -334,15 +661,59 @@
         "exit_conditions"
       ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
-        "input_schema": {"type": "string", "minLength": 1},
-        "output_schema": {"type": "string", "minLength": 1},
-        "preconditions": {"$ref": "#/$defs/nonEmptyStrings"},
-        "postconditions": {"$ref": "#/$defs/nonEmptyStrings"},
-        "invariants": {"$ref": "#/$defs/nonEmptyStrings"},
-        "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
-        "error_classes": {"$ref": "#/$defs/nonEmptyStrings"},
-        "exit_conditions": {"$ref": "#/$defs/nonEmptyStrings"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "input_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preconditions": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "postconditions": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "invariants": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "error_classes": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "exit_conditions": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal",
+        "actions",
+        "exit_condition"
+      ],
+      "properties": {
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actions": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "exit_condition": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }

@@ -1,0 +1,86 @@
+[
+  {
+    "discovery": {
+      "patterns": [
+        "authorize \u2192 validate \u2192 plan \u2192 draft \u2192 human disposition",
+        "durable idempotency and replay",
+        "bounded execution with kill switch",
+        "evidence-grounded abstention and escalation"
+      ],
+      "playbooks": [
+        "inbound triage",
+        "private draft routing"
+      ],
+      "roles": [
+        "support operator",
+        "operations operator",
+        "finance operator",
+        "recruiting operator"
+      ]
+    },
+    "id": "inbound-triage",
+    "ownership": {
+      "healthy_or_done_condition": "The event has exactly one reconstructable draft outcome or a visible terminal failure, cancellation, or abstention; no external side effect occurred.",
+      "mode": "COMPLETE",
+      "owned_object": "one versioned inbound event and its private draft disposition",
+      "responsibility": "Produce one authorized, evidence-grounded private triage draft without taking the final disposition.",
+      "stop_approval_escalation_boundary": [
+        "stop on authorization, validation, telemetry, deadline, conflict, or kill-switch failure",
+        "abstain on unsupported or contradictory evidence",
+        "route sensitive matches to the named owner",
+        "leave every final disposition to Anushrut Gupta outside this no-write adapter"
+      ],
+      "verification_evidence": [
+        "current-policy authorization decision",
+        "exact source version and UTF-8 byte evidence spans",
+        "durable fenced ledger state",
+        "redacted transition, plan, retry, and outcome telemetry",
+        "frozen evaluation metrics and adversarial regression results"
+      ]
+    },
+    "progression": {
+      "operate_safely": {
+        "actions": [
+          "review permissions, approvals, threat model, failure matrix, and runbook",
+          "keep the adapter no-write until a separately reviewed T2 contract exists",
+          "retest after every permission, policy, runtime, dependency, model, adapter, or incident change",
+          "use the owner-controlled kill switch and evidence-bound reconciliation procedure"
+        ],
+        "exit_condition": "Operators can identify authorization, approval, monitoring, recovery, escalation, and stop boundaries without inferring them from prompt text.",
+        "goal": "Understand the controls required before adapting the playbook to live systems."
+      },
+      "run_repeatedly": {
+        "actions": [
+          "run all repository and tutorial tests",
+          "run the frozen evaluation and inspect raw numerators and denominators",
+          "exercise serial, concurrent, reordered, failed, cancelled, and recovered cases"
+        ],
+        "exit_condition": "All frozen tests and zero-failure invariants pass repeatedly.",
+        "goal": "Prove replay, ordering, recovery, and evaluation behavior are repeatable."
+      },
+      "try_it": {
+        "actions": [
+          "install the locked environment with uv sync --frozen",
+          "run the supplied synthetic fixture through the local adapter",
+          "confirm outputs remain drafts with exact evidence and no side effects"
+        ],
+        "exit_condition": "The sample run finishes with deterministic drafts and no external action.",
+        "goal": "Run the deterministic pilot once on synthetic events and inspect private drafts."
+      }
+    },
+    "risk": {
+      "audience": "authorized local operator and named human disposition owner",
+      "capabilities": [
+        "read one current-policy-authorized supplied record",
+        "create an in-process private draft"
+      ],
+      "data_class": "synthetic inbound text; the reference contract treats live inbound text as confidential",
+      "rationale": "Bounded current-policy-authorized synthetic reads produce private drafts only; no network, external destination, write, send, or final disposition exists.",
+      "side_effects": [],
+      "tier": "T1"
+    },
+    "status": "needs_retest",
+    "title": "Inbound triage with suggested resolution and routing",
+    "version": "0.4.0"
+  }
+]

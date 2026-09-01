@@ -50,10 +50,10 @@ def test_pilot_has_no_side_effects_and_is_draft():
 
 def test_manifest_contract_is_fully_resolved():
     data = manifest()
-    assert data["version"] == "0.3.0"
+    assert data["version"] == "0.4.0"
     assert data["changelog"] == data["files"]["changelog"]
     assert data["adapters"] == ["local-python"]
-    assert data["tested_versions"]["local-python-adapter"] == "0.3.0"
+    assert data["tested_versions"]["local-python-adapter"] == "0.4.0"
     assert data["tested_versions"]["fixture-set"] == data["evaluation"]["fixture_version"]
     assert data["lifecycle"]["maintainer"] == "Anushrut Gupta"
     assert data["lifecycle"]["domain_owner"] == "Anushrut Gupta"
@@ -154,6 +154,11 @@ def test_remediation_covers_every_failed_row_with_tests():
     assert remediation["rubric_changed"] is False
     assert set(remediation["failed_rows"]) == expected
     assert all(row["changes"] and row["tests"] for row in remediation["failed_rows"].values())
+    assert len(remediation["third_review_attacks"]) == 8
+    assert all(
+        row["change"] and row["tests"]
+        for row in remediation["third_review_attacks"].values()
+    )
 
 
 def test_ci_runs_the_complete_gate():
@@ -168,5 +173,32 @@ def test_ci_runs_the_complete_gate():
         "inbound-triage/run.py",
     ):
         assert command in ci
+    # Generated-site freshness is exercised transitively by pytest through
+    # tests/test_site.py; keeping it there avoids a workflow-file mutation for
+    # integrations that can write repository content but not Actions workflows.
+    assert (ROOT / "tests" / "test_site.py").exists()
     assert 'version: "0.12.8"' in ci
     assert "uv python install 3.14.4" in ci
+
+
+def test_discovery_ownership_and_progression_contract():
+    data = manifest()
+    assert set(data["discovery"]) == {"roles", "playbooks", "patterns"}
+    assert all(data["discovery"].values())
+    assert data["ownership"]["mode"] in {"MAINTAIN", "COMPLETE"}
+    for field in (
+        "responsibility",
+        "owned_object",
+        "healthy_or_done_condition",
+        "verification_evidence",
+        "stop_approval_escalation_boundary",
+    ):
+        assert data["ownership"][field]
+    assert list(data["progression"]) == [
+        "try_it",
+        "run_repeatedly",
+        "operate_safely",
+    ]
+    for stage in data["progression"].values():
+        assert set(stage) == {"goal", "actions", "exit_condition"}
+        assert stage["goal"] and stage["actions"] and stage["exit_condition"]
