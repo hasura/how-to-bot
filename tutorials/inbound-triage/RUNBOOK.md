@@ -22,7 +22,7 @@ exceptions to be visible.
 ## Stop while idle or mid-run
 
 Anushrut Gupta calls `KillSwitch.activate(actor_id=..., reason=...)` independently of
-event/model content. The switch blocks new work and is checked throughout execution.
+event/model content. The switch blocks new work and is checked throughout execution, including after staged ledger completion and atomically at final publication.
 Record the audit entry and inspect the ledger for executing/cancelled entries. There is
 no side-effect inventory because this adapter has no effect capability.
 
@@ -31,10 +31,9 @@ no side-effect inventory because this adapter has no effect capability.
 Mark a genuinely abandoned `executing` claim interrupted using the owner-only ledger
 operation. Reconcile every failed/cancelled entry. Recheck exact version, current
 requester policy, source version, limits, and complete tests. Anushrut Gupta may then
-call `resume(..., reconciled=True, reason=...)`. Resume without reconciliation fails.
+call `resume(..., reconciled=True, reason=..., ledger=ledger)`. A caller assertion without the ledger, or a ledger with any executing, failed, cancelled, or staged entry, fails.
 
-A recovered run must emit retry and reconciled events and still yield only one semantic
-outcome. Two failed attempts trigger the repeated-error stop; investigate rather than
+A recovered run must emit claim, retry, outcome, and reconciled events and still yield only one finalized semantic outcome; stale owners must receive a conflict. Two failed attempts trigger the repeated-error stop; investigate rather than
 retrying again.
 
 ## Authorization, denial, and degraded mode
@@ -58,4 +57,4 @@ Ordinary defects: <https://github.com/hasura/how-to-bot/issues>. Sensitive repor
 Permission, policy, runtime, dependency, model, adapter, or incident changes immediately
 force `needs_retest`; do not represent prior demonstrated claims as current. Sensitive,
 suspected-leakage, authorization, stop, or recovery failures go to Anushrut Gupta.
-Expected external cost is zero; enforced per-run duration is at most 30 seconds.
+Expected external cost is zero. Callers may shorten but cannot expand the 30-second global maximum. Enforced step ceilings are authorize 5s, validate 5s, claim 10s, plan 5s, record 5s, and recover 30s.

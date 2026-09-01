@@ -1,6 +1,6 @@
 # How to Bot
 
-**Status: Gate 2 draft — not approved for merge, release, or publication**
+**Status: Gate 2 needs independent retest — not approved for merge, release, or publication**
 
 How to Bot is an open operating manual for persistent workplace bots. It publishes
 testable operational contracts—not prompt snippets. Every tutorial defines the job,
@@ -14,16 +14,16 @@ behavior, recovery, stop path, evidence, and maintenance status.
 - Cross-file manifest, link, secret, lint, and test checks.
 - A synthetic **inbound triage** pilot demonstrating current-policy authorization,
   deterministic draft routing/abstention, exact evidence spans, named human disposition,
-  durable atomic replay handling, redacted histories, deadlines, and an independently
-  activatable stop control.
-- A predeclared versioned evaluation set with raw numerators and denominators.
-- A row-by-row remediation ledger for the independent review failures.
+  owner-fenced durable replay handling, reconstructable redacted histories, enforced
+  step/global deadlines, and a generation-fenced independently activatable stop control.
+- A predeclared versioned evaluation set with raw numerators/denominators, nine zero-failure invariants, and the six independent attacks.
+- An exact row-by-row remediation ledger for all 18 failures in the second independent review.
 
 ## Exact tested environment
 
 - CPython 3.14.4
 - uv 0.12.8
-- local-python adapter 0.2.0
+- local-python adapter 0.3.0
 - Exact dependency versions are locked in `uv.lock` and repeated in the tutorial manifest.
 
 Prerequisites: install [uv](https://docs.astral.sh/uv/) 0.12.8. `uv sync --frozen`
@@ -53,7 +53,7 @@ durable across local adapter instances but is not a distributed ledger.
 - `schemas/` — tutorial, permission, approval, claim, and evaluation schemas.
 - `tools/` — repository validation.
 - `tutorials/inbound-triage/` — the only runnable pilot.
-- `tutorials/inbound-triage/remediation.yaml` — traceability for the 20 failed review rows.
+- `tutorials/inbound-triage/remediation.yaml` — traceability for the 18 failed rows in the second review.
 - `patterns/` — reusable operational patterns.
 - `platforms/` — adapter contract guidance.
 
@@ -67,6 +67,7 @@ T4 workflows are not publishable as ordinary runnable tutorials.
 See [SECURITY.md](SECURITY.md), [TUTORIAL_STANDARD.md](TUTORIAL_STANDARD.md), and
 the pilot [threat model](tutorials/inbound-triage/THREAT_MODEL.md).
 
-Passing author-side tests establishes only the narrowly scoped `demonstrated` claims in
-`claims.yaml`. It does not establish independent reproduction, production readiness,
-safety, reliability, portability, merge approval, or publication approval.
+All v0.3.0 claims remain `documented` while status is `needs_retest`. Passing author-side
+checks does not promote them to `demonstrated` and does not establish independent
+reproduction, production readiness, safety, reliability, portability, merge approval,
+or publication approval.

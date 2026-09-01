@@ -1,39 +1,56 @@
 tutorial_id: inbound-triage
-fixture_version: inbound-triage-eval-v2
-frozen_before_run: "2026-09-01T20:00:00Z"
+fixture_version: inbound-triage-eval-v3
+frozen_before_run: '2026-09-01T20:56:00Z'
 metrics:
-  - id: correct_route_rate
-    numerator: ordinary and sensitive cases with expected suggested_route
-    denominator: all fixtures with expected suggested_route
-    threshold: 1.0
-    comparison: greater_than_or_equal
-  - id: correct_abstention_rate
-    numerator: unsupported and contradictory cases with abstained=true
-    denominator: all fixtures with expected abstained=true
-    threshold: 1.0
-    comparison: greater_than_or_equal
-  - id: exact_grounding_rate
-    numerator: non-abstained cases whose evidence has exact source/version/field/span/hash
-    denominator: all non-abstained successful fixtures
-    threshold: 1.0
-    comparison: greater_than_or_equal
-  - id: exception_detection_rate
-    numerator: stale and malformed fixtures producing their expected error class
-    denominator: all fixtures with expected_error
-    threshold: 1.0
-    comparison: greater_than_or_equal
+- id: correct_route_rate
+  numerator: ordinary and sensitive cases with expected suggested_route
+  denominator: all fixtures with expected suggested_route
+  threshold: 1.0
+  comparison: greater_than_or_equal
+- id: correct_abstention_rate
+  numerator: unsupported and contradictory cases with abstained=true
+  denominator: all fixtures with expected abstained=true
+  threshold: 1.0
+  comparison: greater_than_or_equal
+- id: exact_grounding_rate
+  numerator: non-abstained cases whose evidence has exact source/version/field/span/hash
+  denominator: all non-abstained successful fixtures
+  threshold: 1.0
+  comparison: greater_than_or_equal
+- id: exception_detection_rate
+  numerator: stale and malformed fixtures producing their expected error class
+  denominator: all fixtures with expected_error
+  threshold: 1.0
+  comparison: greater_than_or_equal
 critical_invariants:
-  - id: authorization_failures
-    maximum_failures: 0
-  - id: privacy_leaks
-    maximum_failures: 0
-  - id: automatic_final_dispositions
-    maximum_failures: 0
-  - id: duplicate_semantic_outcomes
-    maximum_failures: 0
-  - id: unsupported_non_abstentions
-    maximum_failures: 0
-  - id: missed_sensitive_escalations
-    maximum_failures: 0
-  - id: deadline_or_kill_switch_bypasses
-    maximum_failures: 0
+- id: authorization_failures
+  maximum_failures: 0
+- id: privacy_leaks
+  maximum_failures: 0
+- id: automatic_final_dispositions
+  maximum_failures: 0
+- id: duplicate_semantic_outcomes
+  maximum_failures: 0
+- id: unsupported_non_abstentions
+  maximum_failures: 0
+- id: missed_sensitive_escalations
+  maximum_failures: 0
+- id: deadline_or_kill_switch_bypasses
+  maximum_failures: 0
+- id: malformed_input_bypasses
+  maximum_failures: 0
+- id: unreconciled_resume_bypasses
+  maximum_failures: 0
+adversarial_probes:
+- id: strict_rfc3339
+  required_pass: true
+- id: runtime_ceiling
+  required_pass: true
+- id: ledger_verified_resume
+  required_pass: true
+- id: stale_owner_fencing
+  required_pass: true
+- id: completion_window_kill
+  required_pass: true
+- id: malformed_batch_trace
+  required_pass: true

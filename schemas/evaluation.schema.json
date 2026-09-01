@@ -3,24 +3,62 @@
   "$id": "https://howtobot.ai/schemas/evaluation.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["tutorial_id", "fixture_version", "frozen_before_run", "metrics", "critical_invariants"],
+  "required": [
+    "tutorial_id",
+    "fixture_version",
+    "frozen_before_run",
+    "metrics",
+    "critical_invariants",
+    "adversarial_probes"
+  ],
   "properties": {
-    "tutorial_id": {"type": "string"},
-    "fixture_version": {"type": "string", "minLength": 1},
-    "frozen_before_run": {"type": "string", "format": "date-time"},
+    "tutorial_id": {
+      "type": "string"
+    },
+    "fixture_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "frozen_before_run": {
+      "type": "string",
+      "format": "date-time"
+    },
     "metrics": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "numerator", "denominator", "threshold", "comparison"],
+        "required": [
+          "id",
+          "numerator",
+          "denominator",
+          "threshold",
+          "comparison"
+        ],
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
-          "numerator": {"type": "string", "minLength": 1},
-          "denominator": {"type": "string", "minLength": 1},
-          "threshold": {"type": "number", "minimum": 0, "maximum": 1},
-          "comparison": {"enum": ["greater_than_or_equal"]}
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "numerator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "denominator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "comparison": {
+            "enum": [
+              "greater_than_or_equal"
+            ]
+          }
         }
       }
     },
@@ -30,10 +68,40 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "maximum_failures"],
+        "required": [
+          "id",
+          "maximum_failures"
+        ],
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
-          "maximum_failures": {"const": 0}
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "maximum_failures": {
+            "const": 0
+          }
+        }
+      }
+    },
+    "adversarial_probes": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "required_pass"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "required_pass": {
+            "const": true
+          }
         }
       }
     }

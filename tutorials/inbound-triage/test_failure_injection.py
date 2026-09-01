@@ -16,6 +16,7 @@ from howtobot.inbound_triage import (
     PolicyError,
     REQUIRED_SCOPE,
     RepeatedErrorStop,
+    STEP_TIMEOUT_SECONDS,
     RequestContext,
     TelemetrySink,
     TelemetryUnavailableError,
@@ -231,7 +232,7 @@ def test_idle_and_midrun_kill_switch_and_controlled_resume():
         invoke(item, state)
     with pytest.raises(PolicyError):
         switch.resume(actor_id="Anushrut Gupta", reconciled=False, reason="unsafe")
-    switch.resume(actor_id="Anushrut Gupta", reconciled=True, reason="idle reconciled")
+    switch.resume(actor_id="Anushrut Gupta", reconciled=True, reason="idle reconciled", ledger=state[2])
 
     midrun = event("evt-midrun")
     state2 = runtime([midrun])
@@ -251,7 +252,7 @@ def test_idle_and_midrun_kill_switch_and_controlled_resume():
     assert state2[2].snapshot(actor_role="independent-reviewer")[midrun["id"]] == "cancelled"
     assert [row["action"] for row in state2[4].audit_log()] == ["activated"]
     state2[2].reconcile(midrun["id"])
-    state2[4].resume(actor_id="Anushrut Gupta", reconciled=True, reason="run reconciled")
+    state2[4].resume(actor_id="Anushrut Gupta", reconciled=True, reason="run reconciled", ledger=state2[2])
     recovered = invoke(midrun, state2)
     assert recovered.terminal_state == "reconciled"
     assert state2[4].audit_log()[-1]["action"] == "resumed"
@@ -442,3 +443,222 @@ def test_ledger_retention_is_owner_enforced():
     )
     assert purged == 1
     assert state[2].snapshot(actor_role="independent-reviewer") == {}
+
+
+# Canonicalized from the second independent Gate 2 review. These attacks must remain.
+def test_reviewer_probe_rejects_iso_basic_timestamp():
+    item = {**event("evt-basic-time"), "received_at": "20260901T190000+00:00"}
+    with pytest.raises(ValidationError):
+        invoke(item, runtime([item]))
+
+
+def test_reviewer_probe_runtime_ceiling_cannot_be_expanded():
+    item = event("evt-runtime-ceiling")
+    state = runtime([item])
+    with pytest.raises(PolicyError) as exc:
+        invoke(item, state, max_runtime_seconds=3_630)
+    trace = state[3].events_for(
+        exc.value.run_id,
+        actor_role="independent-reviewer",
+    )
+    assert [row["state"] for row in trace] == ["received", "failed"]
+    assert trace[-1]["code"] == "policy"
+
+
+def test_reviewer_probe_resume_requires_ledger_verified_reconciliation():
+    item = event("evt-unverified-resume")
+    state = runtime([item])
+    ledger = state[2]
+    switch = state[4]
+    fingerprint = __import__("hashlib").sha256(
+        "\x1f".join(
+            item[field].strip()
+            for field in ("received_at", "source", "source_version", "subject", "body", "reporter")
+        ).encode()
+    ).hexdigest()
+    mode, _, _ = ledger.claim(
+        event_id=item["id"],
+        fingerprint=fingerprint,
+        run_id="cancelled-run",
+        deadline=time.monotonic() + 1,
+    )
+    assert mode == "owner"
+    ledger.abort(item["id"], "cancelled", run_id="cancelled-run")
+    switch.activate(actor_id="Anushrut Gupta", reason="independent resume attack")
+    with pytest.raises(PolicyError):
+        switch.resume(
+            actor_id="Anushrut Gupta",
+            reconciled=True,
+            reason="caller assertion is not durable proof",
+            ledger=ledger,
+        )
+
+
+def test_reviewer_probe_stale_owner_cannot_complete_after_recovery_owner():
+    item = event("evt-stale-owner")
+    state = runtime([item])
+    stale_started = threading.Event()
+    release_stale = threading.Event()
+
+    def pause_stale(stage):
+        if stage == "executing":
+            stale_started.set()
+            assert release_stale.wait(timeout=2)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        stale = pool.submit(invoke, item, state, step_hook=pause_stale)
+        assert stale_started.wait(timeout=1)
+        state[2].mark_interrupted_for_recovery(item["id"], actor_id="Anushrut Gupta")
+        recovered = pool.submit(invoke, item, state).result(timeout=2)
+        release_stale.set()
+        with pytest.raises(ConflictError):
+            stale.result(timeout=2)
+
+    assert recovered.duplicate is False
+    assert recovered.terminal_state == "reconciled"
+    assert state[2].snapshot(actor_role="independent-reviewer") == {
+        item["id"]: "reconciled"
+    }
+
+
+def test_reviewer_probe_kill_activation_during_completion_prevents_success():
+    item = event("evt-completion-kill")
+    state = runtime([item])
+    entered_completion = threading.Event()
+    release_completion = threading.Event()
+    original_complete = state[2].complete
+
+    def delayed_complete(*args, **kwargs):
+        entered_completion.set()
+        assert release_completion.wait(timeout=2)
+        return original_complete(*args, **kwargs)
+
+    state[2].complete = delayed_complete
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        running = pool.submit(invoke, item, state)
+        assert entered_completion.wait(timeout=1)
+        state[4].activate(actor_id="Anushrut Gupta", reason="completion-window attack")
+        release_completion.set()
+        with pytest.raises(CancelledError):
+            running.result(timeout=2)
+
+    assert state[2].snapshot(actor_role="independent-reviewer") == {
+        item["id"]: "cancelled"
+    }
+
+
+def test_reviewer_probe_malformed_batch_is_traced_validation_failure():
+    item = event("evt-malformed-batch")
+    del item["received_at"]
+    context, policy, ledger, telemetry, switch = runtime([item])
+    with pytest.raises(ValidationError) as exc:
+        triage_batch(
+            [item],
+            context=context,
+            authorization_policy=policy,
+            ledger=ledger,
+            telemetry=telemetry,
+            kill_switch=switch,
+            evaluation_time=NOW,
+        )
+    trace = telemetry.events_for(exc.value.run_id, actor_role="independent-reviewer")
+    assert trace
+    assert trace[0]["state"] == "received"
+    assert trace[-1]["state"] == "failed"
+    assert trace[-1]["code"] == "validation"
+
+
+
+@pytest.mark.parametrize(
+    ("step", "stage"),
+    [
+        ("authorize-record", "authorized"),
+        ("validate-event", "validated"),
+        ("claim-intent", "claimed"),
+        ("plan-route", "classified"),
+        ("record-draft", "recording"),
+    ],
+)
+def test_each_declared_step_timeout_is_enforced(monkeypatch, step, stage):
+    item = event(f"evt-timeout-{step}")
+    state = runtime([item])
+    monkeypatch.setitem(STEP_TIMEOUT_SECONDS, step, 0.005)
+
+    def delay(current_stage):
+        if current_stage == stage:
+            time.sleep(0.01)
+
+    with pytest.raises(DeadlineExceededError):
+        invoke(item, state, step_hook=delay)
+
+
+def test_recovery_step_timeout_is_enforced(monkeypatch):
+    item = event("evt-timeout-recovery")
+    state = runtime([item])
+
+    def fail(stage):
+        if stage == "executing":
+            raise RuntimeError("create recoverable failure")
+
+    with pytest.raises(PolicyError):
+        invoke(item, state, step_hook=fail)
+
+    monkeypatch.setitem(STEP_TIMEOUT_SECONDS, "recover-run", 0.005)
+
+    def delay(stage):
+        if stage == "executing":
+            time.sleep(0.01)
+
+    with pytest.raises(DeadlineExceededError):
+        invoke(item, state, step_hook=delay)
+
+
+def test_success_outcome_is_reconstructable_from_redacted_telemetry():
+    item = event("evt-telemetry-outcome")
+    state = runtime([item])
+    result = invoke(item, state)
+    trace = state[3].events_for(
+        result.run_id,
+        actor_role="independent-reviewer",
+    )
+    claim = next(row for row in trace if row["kind"] == "claim")
+    plan = next(row for row in trace if row["kind"] == "plan")
+    outcome = next(row for row in trace if row["kind"] == "outcome")
+    assert claim["owner_run_id"] == result.run_id
+    assert plan["suggested_route"] == result.suggested_route
+    assert plan["reason_codes"] == result.reason_codes
+    assert plan["evidence_count"] == len(result.evidence)
+    assert outcome["outcome_status"] == "draft"
+    assert outcome["terminal_state"] == result.terminal_state
+    assert outcome["duplicate"] is False
+    assert "subject" not in repr(trace).casefold()
+    assert "body" not in repr(trace).casefold()
+
+
+
+def test_staged_result_is_not_replay_visible_before_finalization():
+    item = event("evt-staged-result")
+    state = runtime([item])
+    entered_finalization = threading.Event()
+    release_finalization = threading.Event()
+    original_finalize = state[2].finalize
+
+    def delayed_finalize(*args, **kwargs):
+        entered_finalization.set()
+        assert release_finalization.wait(timeout=2)
+        return original_finalize(*args, **kwargs)
+
+    state[2].finalize = delayed_finalize
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        owner = pool.submit(invoke, item, state)
+        assert entered_finalization.wait(timeout=1)
+        replay = pool.submit(invoke, item, state)
+        time.sleep(0.03)
+        assert replay.done() is False
+        release_finalization.set()
+        results = [owner.result(timeout=2), replay.result(timeout=2)]
+
+    assert sorted(result.duplicate for result in results) == [False, True]
+    assert state[2].snapshot(actor_role="independent-reviewer") == {
+        item["id"]: "succeeded"
+    }

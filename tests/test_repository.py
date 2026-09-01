@@ -34,7 +34,7 @@ def test_all_fixtures_are_explicitly_synthetic():
 
 def test_pilot_has_no_side_effects_and_is_draft():
     data = manifest()
-    assert data["status"] == "draft"
+    assert data["status"] == "needs_retest"
     assert data["risk"]["tier"] == "T1"
     assert data["outcome"]["side_effects"] == []
     assert data["risk"]["side_effects"] == []
@@ -50,18 +50,18 @@ def test_pilot_has_no_side_effects_and_is_draft():
 
 def test_manifest_contract_is_fully_resolved():
     data = manifest()
-    assert data["version"] == "0.2.0"
+    assert data["version"] == "0.3.0"
     assert data["changelog"] == data["files"]["changelog"]
     assert data["adapters"] == ["local-python"]
-    assert data["tested_versions"]["local-python-adapter"] == "0.2.0"
+    assert data["tested_versions"]["local-python-adapter"] == "0.3.0"
     assert data["tested_versions"]["fixture-set"] == data["evaluation"]["fixture_version"]
     assert data["lifecycle"]["maintainer"] == "Anushrut Gupta"
     assert data["lifecycle"]["domain_owner"] == "Anushrut Gupta"
     assert data["lifecycle"]["security_exception_owner"] == "Anushrut Gupta"
     assert data["lifecycle"]["issue_path"].startswith("https://github.com/hasura/how-to-bot/")
     assert data["lifecycle"]["security_report_path"].endswith("/security/advisories/new")
-    assert data["lifecycle"]["retest_required"] is False
-    assert data["lifecycle"]["retest_reason"] is None
+    assert data["lifecycle"]["retest_required"] is True
+    assert data["lifecycle"]["retest_reason"]
 
 
 def test_outcome_contract_traces_to_tests():
@@ -147,26 +147,9 @@ def test_each_step_contract_is_complete():
 def test_remediation_covers_every_failed_row_with_tests():
     remediation = yaml.safe_load((TUTORIAL / "remediation.yaml").read_text())
     expected = {
-        "SCH-01",
-        "SCH-02",
-        "SCH-03",
-        "SCH-04",
-        "EVD-01",
-        "PERM-02",
-        "APR-03",
-        "STA-01",
-        "STA-02",
-        "STA-03",
-        "FUN-01",
-        "FUN-02",
-        "FUN-03",
-        "OBS-01",
-        "OBS-02",
-        "FAIL-01",
-        "FAIL-02",
-        "KILL-01",
-        "MNT-01",
-        "MNT-02",
+        "SCH-01", "SCH-02", "SCH-04", "EVD-01", "EVD-02", "STA-01",
+        "STA-02", "STA-03", "FUN-01", "FUN-03", "REP-02", "OBS-01",
+        "FAIL-01", "FAIL-02", "KILL-01", "PLT-02", "MNT-01", "MNT-02",
     }
     assert remediation["rubric_changed"] is False
     assert set(remediation["failed_rows"]) == expected

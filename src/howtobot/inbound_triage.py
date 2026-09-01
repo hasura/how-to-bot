@@ -18,6 +18,14 @@ from uuid import uuid4
 MAX_ITEMS_PER_RUN = 25
 MAX_TEXT_LENGTH = 4_000
 MAX_RUNTIME_SECONDS = 30.0
+STEP_TIMEOUT_SECONDS = {
+    "authorize-record": 5.0,
+    "validate-event": 5.0,
+    "claim-intent": 10.0,
+    "plan-route": 5.0,
+    "record-draft": 5.0,
+    "recover-run": 30.0,
+}
 MAX_EVENT_AGE = timedelta(days=7)
 MAX_FUTURE_SKEW = timedelta(minutes=5)
 REQUIRED_SCOPE = "inbound_events:read"
@@ -149,6 +157,16 @@ class TelemetryEvent:
     code: str
     timestamp: str
     policy_version: str
+    owner_run_id: str | None = None
+    suggested_route: str | None = None
+    outcome_status: str | None = None
+    terminal_state: str | None = None
+    reason_codes: tuple[str, ...] = ()
+    evidence_count: int | None = None
+    confidence: float | None = None
+    abstained: bool | None = None
+    sensitive_case: bool | None = None
+    duplicate: bool | None = None
 
 
 class TelemetrySink:
@@ -211,12 +229,13 @@ class KillSwitchAudit:
 
 
 class KillSwitch:
-    """Owner-controlled stop checked at every execution boundary."""
+    """Owner-controlled stop with an activation generation fenced through completion."""
 
     def __init__(self, *, owner_id: str) -> None:
         self.owner_id = owner_id
         self._active = False
         self._reconciliation_required = False
+        self._generation = 0
         self._lock = threading.Lock()
         self._audit: list[KillSwitchAudit] = []
 
@@ -225,9 +244,14 @@ class KillSwitch:
         with self._lock:
             return self._active
 
+    def generation(self) -> int:
+        with self._lock:
+            return self._generation
+
     def activate(self, *, actor_id: str, reason: str) -> None:
         self._require_owner(actor_id)
         with self._lock:
+            self._generation += 1
             self._active = True
             self._reconciliation_required = True
             self._audit.append(
@@ -240,10 +264,19 @@ class KillSwitch:
                 )
             )
 
-    def resume(self, *, actor_id: str, reconciled: bool, reason: str) -> None:
+    def resume(
+        self,
+        *,
+        actor_id: str,
+        reconciled: bool,
+        reason: str,
+        ledger: DurableLedger | None = None,
+    ) -> None:
         self._require_owner(actor_id)
         if not reconciled:
             raise PolicyError("controlled resume requires reconciliation")
+        if ledger is None or ledger.has_unreconciled_entries():
+            raise PolicyError("controlled resume requires ledger-verified reconciliation")
         with self._lock:
             self._active = False
             self._reconciliation_required = False
@@ -257,10 +290,38 @@ class KillSwitch:
                 )
             )
 
-    def check(self, *, run_id: str) -> None:
+    def check(self, *, run_id: str, expected_generation: int | None = None) -> None:
         with self._lock:
-            if self._active or self._reconciliation_required:
-                raise CancelledError("kill switch is active; reconciliation required", run_id=run_id)
+            self._check_locked(run_id=run_id, expected_generation=expected_generation)
+
+    def finalize_if_unchanged(
+        self,
+        *,
+        run_id: str,
+        expected_generation: int,
+        finalize: Callable[[], None],
+    ) -> None:
+        """Serialize the final ledger publication against switch activation."""
+        with self._lock:
+            self._check_locked(
+                run_id=run_id,
+                expected_generation=expected_generation,
+            )
+            finalize()
+
+    def _check_locked(self, *, run_id: str, expected_generation: int | None) -> None:
+        if (
+            self._active
+            or self._reconciliation_required
+            or (
+                expected_generation is not None
+                and expected_generation != self._generation
+            )
+        ):
+            raise CancelledError(
+                "kill switch is active or changed; reconciliation required",
+                run_id=run_id,
+            )
 
     def audit_log(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -387,7 +448,11 @@ class DurableLedger:
                 if row["fingerprint"] != fingerprint:
                     connection.rollback()
                     raise ConflictError("event identity was replayed with changed content")
-                if row["state"] in {"succeeded", "reconciled"} and row["result_json"]:
+                if (
+                    row["state"] in {"succeeded", "reconciled"}
+                    and row["result_json"]
+                    and row["owner_run_id"] is None
+                ):
                     result = self._deserialize_result(row["result_json"])
                     connection.commit()
                     return "duplicate", result, False
@@ -399,7 +464,7 @@ class DurableLedger:
                         """
                         UPDATE triage_ledger
                         SET state = 'executing', owner_run_id = ?, updated_at = ?
-                        WHERE event_id = ?
+                        WHERE event_id = ? AND state IN ('failed', 'cancelled', 'reconciled')
                         """,
                         (run_id, now, event_id),
                     )
@@ -410,48 +475,96 @@ class DurableLedger:
                 raise DeadlineExceededError("deadline exceeded waiting for concurrent replay")
             time.sleep(min(0.005, max(deadline - time.monotonic(), 0)))
 
-    def complete(self, event_id: str, result: TriageResult) -> None:
+    def complete(
+        self,
+        event_id: str,
+        result: TriageResult,
+        *,
+        run_id: str,
+        terminal_state: str,
+    ) -> None:
+        """Stage a terminal result only for the current fenced owner."""
+        if terminal_state not in {"succeeded", "reconciled"}:
+            raise PolicyError("invalid successful terminal state")
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             cursor = connection.execute(
                 """
                 UPDATE triage_ledger
-                SET state = 'succeeded', result_json = ?, owner_run_id = NULL, updated_at = ?
-                WHERE event_id = ?
+                SET result_json = ?, updated_at = ?
+                WHERE event_id = ? AND state = 'executing' AND owner_run_id = ?
                 """,
-                (json.dumps(result.to_dict(), sort_keys=True), _utc_now_text(), event_id),
+                (
+                    json.dumps(result.to_dict(), sort_keys=True),
+                    _utc_now_text(),
+                    event_id,
+                    run_id,
+                ),
             )
             if cursor.rowcount != 1:
                 connection.rollback()
-                raise PolicyError("ledger completion lost its atomic claim")
+                raise ConflictError(
+                    "stale ledger owner cannot complete recovered intent",
+                    run_id=run_id,
+                )
             connection.commit()
 
-    def abort(self, event_id: str, state: str) -> None:
+    def finalize(self, event_id: str, *, run_id: str, terminal_state: str) -> None:
+        """Publish a staged result after the final deadline/stop fence passes."""
         with self._connect() as connection:
-            connection.execute(
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
                 """
                 UPDATE triage_ledger
-                SET state = ?, failures = failures + 1, owner_run_id = NULL, updated_at = ?
-                WHERE event_id = ?
+                SET state = ?, owner_run_id = NULL, updated_at = ?
+                WHERE event_id = ? AND state = 'executing' AND owner_run_id = ?
+                  AND result_json IS NOT NULL
                 """,
-                (state, _utc_now_text(), event_id),
+                (terminal_state, _utc_now_text(), event_id, run_id),
             )
+            if cursor.rowcount != 1:
+                connection.rollback()
+                raise ConflictError(
+                    "ledger finalization lost its fenced ownership",
+                    run_id=run_id,
+                )
+            connection.commit()
+
+    def abort(self, event_id: str, state: str, *, run_id: str) -> bool:
+        """Abort only the caller's live or staged claim; stale owners cannot overwrite."""
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE triage_ledger
+                SET state = ?, result_json = NULL, failures = failures + 1,
+                    owner_run_id = NULL, updated_at = ?
+                WHERE event_id = ? AND owner_run_id = ?
+                """,
+                (state, _utc_now_text(), event_id, run_id),
+            )
+            return cursor.rowcount == 1
 
     def mark_interrupted_for_recovery(self, event_id: str, *, actor_id: str) -> None:
         self._require_owner(actor_id)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT state FROM triage_ledger WHERE event_id = ?", (event_id,)
+                "SELECT state, owner_run_id FROM triage_ledger WHERE event_id = ?",
+                (event_id,),
             ).fetchone()
-            if row is None or row["state"] != "executing":
+            if (
+                row is None
+                or row["state"] != "executing"
+                or row["owner_run_id"] is None
+            ):
                 connection.rollback()
-                raise PolicyError("only an executing intent may be marked interrupted")
+                raise PolicyError("only an owned executing intent may be marked interrupted")
             connection.execute(
                 """
                 UPDATE triage_ledger
-                SET state = 'failed', failures = failures + 1, owner_run_id = NULL, updated_at = ?
-                WHERE event_id = ?
+                SET state = 'failed', result_json = NULL, failures = failures + 1,
+                    owner_run_id = NULL, updated_at = ?
+                WHERE event_id = ? AND state = 'executing'
                 """,
                 (_utc_now_text(), event_id),
             )
@@ -462,12 +575,25 @@ class DurableLedger:
             cursor = connection.execute(
                 """
                 UPDATE triage_ledger SET state = 'reconciled', updated_at = ?
-                WHERE event_id = ? AND state IN ('failed', 'cancelled', 'succeeded')
+                WHERE event_id = ? AND owner_run_id IS NULL
+                  AND state IN ('failed', 'cancelled', 'succeeded')
                 """,
                 (_utc_now_text(), event_id),
             )
             if cursor.rowcount != 1:
-                raise PolicyError("only terminal ledger entries can be reconciled")
+                raise PolicyError("only finalized terminal ledger entries can be reconciled")
+
+    def has_unreconciled_entries(self) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT 1 FROM triage_ledger
+                WHERE state IN ('executing', 'failed', 'cancelled')
+                   OR owner_run_id IS NOT NULL
+                LIMIT 1
+                """
+            ).fetchone()
+        return row is not None
 
     def delete(self, event_id: str, *, actor_id: str) -> None:
         self._require_owner(actor_id)
@@ -525,7 +651,7 @@ class _RunTrace:
         self.state = "received"
         self.emit("transition", "received")
 
-    def emit(self, kind: str, code: str) -> None:
+    def emit(self, kind: str, code: str, **details: Any) -> None:
         self.telemetry.emit(
             TelemetryEvent(
                 sequence=0,
@@ -539,6 +665,7 @@ class _RunTrace:
                 code=code,
                 timestamp=_utc_now_text(),
                 policy_version=self.context.policy_version,
+                **details,
             )
         )
 
@@ -564,12 +691,21 @@ def _metadata(event: dict[str, Any]) -> dict[str, str]:
     return {name: event[name] for name in names}
 
 
+_RFC3339 = re.compile(
+    r"^(?P<date>\d{4}-\d{2}-\d{2})T"
+    r"(?P<time>\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?)"
+    r"(?P<zone>Z|[+-]\d{2}:\d{2})$"
+)
+
+
 def _parse_timestamp(value: str) -> datetime:
+    if not isinstance(value, str) or _RFC3339.fullmatch(value) is None:
+        raise ValidationError("received_at must be a strict RFC3339 timestamp")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except (TypeError, ValueError) as exc:
-        raise ValidationError("received_at must be an RFC3339 timestamp") from exc
-    if parsed.tzinfo is None:
+    except ValueError as exc:
+        raise ValidationError("received_at must be a valid RFC3339 timestamp") from exc
+    if parsed.utcoffset() is None:
         raise ValidationError("received_at must include a timezone")
     return parsed.astimezone(timezone.utc)
 
@@ -676,21 +812,40 @@ def triage_one(
     run_id = str(uuid4())
     correlation_id = str(uuid4())
     event_id = str(event.get("id", "unknown"))
-    deadline = time.monotonic() + max_runtime_seconds
     trace: _RunTrace | None = None
     claimed = False
     recovered = False
+    recovery_started: float | None = None
 
-    def checkpoint(stage: str) -> None:
+    deadline = float("inf")
+    switch_generation = kill_switch.generation()
+
+    def fence(stage: str, *, step_started: float | None = None, step: str | None = None) -> None:
         if step_hook is not None:
             step_hook(stage)
-        if time.monotonic() > deadline:
+        now = time.monotonic()
+        if now > deadline:
             raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
-        kill_switch.check(run_id=run_id)
+        if step_started is not None and step is not None:
+            if now - step_started > STEP_TIMEOUT_SECONDS[step]:
+                raise DeadlineExceededError(
+                    f"{step} step timeout exceeded",
+                    run_id=run_id,
+                )
+        if (
+            recovery_started is not None
+            and now - recovery_started > STEP_TIMEOUT_SECONDS["recover-run"]
+        ):
+            raise DeadlineExceededError(
+                "recover-run step timeout exceeded",
+                run_id=run_id,
+            )
+        kill_switch.check(
+            run_id=run_id,
+            expected_generation=switch_generation,
+        )
 
     try:
-        if max_runtime_seconds <= 0:
-            raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
         trace = _RunTrace(
             telemetry=telemetry,
             run_id=run_id,
@@ -698,35 +853,83 @@ def triage_one(
             event_id=event_id,
             context=context,
         )
-        checkpoint("received")
+        if not isinstance(max_runtime_seconds, (int, float)) or isinstance(
+            max_runtime_seconds, bool
+        ):
+            raise PolicyError("maximum runtime must be numeric", run_id=run_id)
+        if max_runtime_seconds <= 0:
+            raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
+        if max_runtime_seconds > MAX_RUNTIME_SECONDS:
+            raise PolicyError(
+                f"maximum runtime cannot exceed {MAX_RUNTIME_SECONDS:g} seconds",
+                run_id=run_id,
+            )
+        deadline = time.monotonic() + max_runtime_seconds
+        fence("received")
+
+        step_started = time.monotonic()
         metadata = _metadata(event)
         authorization_policy.authorize(context, metadata)
         trace.emit("policy_decision", "authorized")
-        checkpoint("authorized")
+        fence("authorized", step_started=step_started, step="authorize-record")
 
+        step_started = time.monotonic()
         _validate_event(event, evaluation_time=evaluation_time)
         trace.transition("validated")
-        checkpoint("validated")
+        fence("validated", step_started=step_started, step="validate-event")
 
-        fingerprint = _fingerprint(event)
-        mode, prior, recovered = ledger.claim(
-            event_id=event["id"], fingerprint=fingerprint, run_id=run_id, deadline=deadline
+        step_started = time.monotonic()
+        claim_deadline = min(
+            deadline,
+            step_started + STEP_TIMEOUT_SECONDS["claim-intent"],
         )
+        mode, prior, recovered = ledger.claim(
+            event_id=event["id"],
+            fingerprint=_fingerprint(event),
+            run_id=run_id,
+            deadline=claim_deadline,
+        )
+        fence("claimed", step_started=step_started, step="claim-intent")
         if mode == "duplicate":
             assert prior is not None
+            trace.emit(
+                "claim",
+                "duplicate",
+                owner_run_id=prior.run_id,
+                duplicate=True,
+                terminal_state=prior.terminal_state,
+            )
             trace.transition("planned", "exact_replay")
             trace.transition("executing", "duplicate_suppressed")
+            trace.emit(
+                "outcome",
+                "original_outcome_reused",
+                suggested_route=prior.suggested_route,
+                outcome_status=prior.status,
+                terminal_state=prior.terminal_state,
+                reason_codes=prior.reason_codes,
+                evidence_count=len(prior.evidence),
+                confidence=prior.confidence,
+                abstained=prior.abstained,
+                sensitive_case=prior.sensitive_case,
+                duplicate=True,
+            )
             trace.transition("succeeded", "original_outcome_reused")
             return replace(prior, duplicate=True, run_id=run_id)
+
         claimed = True
         if recovered:
-            trace.emit("retry", "recovering_prior_failure")
+            recovery_started = time.monotonic()
+        trace.emit("claim", "recovered" if recovered else "acquired", owner_run_id=run_id)
+        if recovered:
+            trace.emit("retry", "recovering_prior_failure", owner_run_id=run_id)
 
         trace.transition("planned")
-        checkpoint("planned")
-        trace.transition("executing")
-        checkpoint("executing")
+        fence("planned")
 
+        step_started = time.monotonic()
+        trace.transition("executing")
+        fence("executing")
         route, reasons, confidence, spans, abstained = _route(event)
         sensitive_hits: list[EvidenceSpan] = []
         for term in SENSITIVE_TERMS:
@@ -741,8 +944,9 @@ def triage_one(
             confidence = max(confidence, 0.8)
             spans = tuple(dict.fromkeys((*spans, *sensitive_hits)))
             abstained = False
+        fence("classified", step_started=step_started, step="plan-route")
 
-        checkpoint("classified")
+        step_started = time.monotonic()
         facts = tuple(
             {
                 "fact_id": f"fact-{index + 1}",
@@ -763,6 +967,7 @@ def triage_one(
             "security": "Have the named human perform the sensitive-case security review.",
             "technical-support": "Have the named human review the referenced technical evidence.",
         }
+        terminal_state = "reconciled" if recovered else "succeeded"
         result = TriageResult(
             event_id=event["id"],
             source_version=event["source_version"],
@@ -781,28 +986,75 @@ def triage_one(
             duplicate=False,
             idempotency_key=_idempotency_key(event["id"]),
             run_id=run_id,
-            terminal_state="reconciled" if recovered else "succeeded",
+            terminal_state=terminal_state,
+        )
+        trace.emit(
+            "plan",
+            "route_planned",
+            owner_run_id=run_id,
+            suggested_route=result.suggested_route,
+            outcome_status=result.status,
+            terminal_state=terminal_state,
+            reason_codes=result.reason_codes,
+            evidence_count=len(result.evidence),
+            confidence=result.confidence,
+            abstained=result.abstained,
+            sensitive_case=result.sensitive_case,
+            duplicate=False,
         )
         trace.emit("tool_inventory", "none")
         trace.emit("side_effect_inventory", "none")
-        ledger.complete(event["id"], result)
+        fence("recording", step_started=step_started, step="record-draft")
+
+        ledger.complete(
+            event["id"],
+            result,
+            run_id=run_id,
+            terminal_state=terminal_state,
+        )
+        # This post-completion fence is intentional: a stop/deadline arriving while
+        # SQLite completion is blocked converts the staged outcome to cancelled/failed.
+        fence("completed", step_started=step_started, step="record-draft")
+        kill_switch.finalize_if_unchanged(
+            run_id=run_id,
+            expected_generation=switch_generation,
+            finalize=lambda: ledger.finalize(
+                event["id"],
+                run_id=run_id,
+                terminal_state=terminal_state,
+            ),
+        )
+
+        trace.emit(
+            "outcome",
+            "draft_recorded",
+            owner_run_id=run_id,
+            suggested_route=result.suggested_route,
+            outcome_status=result.status,
+            terminal_state=terminal_state,
+            reason_codes=result.reason_codes,
+            evidence_count=len(result.evidence),
+            confidence=result.confidence,
+            abstained=result.abstained,
+            sensitive_case=result.sensitive_case,
+            duplicate=False,
+        )
         trace.transition("succeeded")
         if recovered:
-            ledger.reconcile(event["id"])
             trace.transition("reconciled", "recovery_verified")
         return result
     except TriageError as exc:
         if exc.run_id is None:
             exc.run_id = run_id
+        terminal = "cancelled" if isinstance(exc, CancelledError) else "failed"
         if trace is not None:
-            terminal = "cancelled" if isinstance(exc, CancelledError) else "failed"
             if trace.state not in {"succeeded", "failed", "cancelled", "reconciled"}:
                 try:
                     trace.transition(terminal, exc.code)
                 except TelemetryUnavailableError:
                     pass
             if claimed:
-                ledger.abort(event_id, terminal)
+                ledger.abort(event_id, terminal, run_id=run_id)
         raise
     except Exception as exc:
         if trace is not None and trace.state not in {"failed", "cancelled", "reconciled"}:
@@ -811,7 +1063,7 @@ def triage_one(
             except TelemetryUnavailableError:
                 pass
         if claimed:
-            ledger.abort(event_id, "failed")
+            ledger.abort(event_id, "failed", run_id=run_id)
         raise PolicyError("runtime step failed safely", run_id=run_id) from exc
 
 
@@ -831,7 +1083,31 @@ def triage_batch(
     active_ledger = ledger or DurableLedger()
     active_telemetry = telemetry or TelemetrySink()
     active_switch = kill_switch or KillSwitch(owner_id="Anushrut Gupta")
-    ordered = sorted(events, key=lambda item: (_parse_timestamp(item["received_at"]), item["id"]))
+
+    # Validate sort keys through triage_one so malformed input receives a run id
+    # and governed received -> failed telemetry instead of an untraced KeyError.
+    sortable: list[tuple[datetime, str, dict[str, Any]]] = []
+    for item in events:
+        try:
+            received = _parse_timestamp(item.get("received_at"))
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or not item_id:
+                raise ValidationError("event id is required for deterministic ordering")
+        except TriageError:
+            triage_one(
+                item,
+                context=context,
+                authorization_policy=authorization_policy,
+                ledger=active_ledger,
+                telemetry=active_telemetry,
+                kill_switch=active_switch,
+                evaluation_time=evaluation_time,
+                max_runtime_seconds=max_runtime_seconds,
+            )
+            raise AssertionError("unreachable")
+        sortable.append((received, item_id, item))
+
+    ordered = [item for _, _, item in sorted(sortable, key=lambda row: (row[0], row[1]))]
     return [
         triage_one(
             event,

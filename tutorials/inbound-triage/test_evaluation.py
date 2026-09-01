@@ -10,13 +10,15 @@ ROOT = Path(__file__).parent
 
 def test_evaluation_contract_was_predeclared_and_is_strict():
     contract = yaml.safe_load((ROOT / "evaluation.yaml").read_text())
-    assert contract["fixture_version"] == "inbound-triage-eval-v2"
-    assert contract["frozen_before_run"] == "2026-09-01T20:00:00Z"
+    assert contract["fixture_version"] == "inbound-triage-eval-v3"
+    assert contract["frozen_before_run"] == "2026-09-01T20:56:00Z"
     assert all(metric["threshold"] == 1.0 for metric in contract["metrics"])
     assert all(
         invariant["maximum_failures"] == 0
         for invariant in contract["critical_invariants"]
     )
+    assert len(contract["adversarial_probes"]) == 6
+    assert all(probe["required_pass"] is True for probe in contract["adversarial_probes"])
 
 
 def test_frozen_evaluation_reports_raw_passing_denominators():
@@ -40,4 +42,6 @@ def test_frozen_evaluation_reports_raw_passing_denominators():
     } == expected
     assert all(row["passed"] for row in report["metrics"])
     assert all(row["passed"] for row in report["critical_invariants"])
+    assert report["adversarial_summary"] == {"passed": 6, "total": 6}
+    assert all(row["passed"] for row in report["adversarial_probes"])
     assert all(row["passed"] for row in report["cases"])

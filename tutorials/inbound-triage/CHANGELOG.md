@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 — 2026-09-01
+
+Second Gate 2 remediation after independent review of commit
+`1f4e4a6c835c402abe44cbcfbb5e526edca7e859`:
+
+- Preserved the six reviewer-authored attacks as canonical pytest and evaluation probes.
+- Added strict RFC3339 syntax, a non-expandable 30-second runtime ceiling, and all six
+  declared step-timeout fences.
+- Added `owner_run_id` fencing, staged/finalized results, stale-owner rejection, and
+  kill-switch generation serialization through final publication.
+- Made resume depend on DurableLedger-verified reconciliation.
+- Made malformed pre-sort batches produce governed, attributable validation histories.
+- Added redacted claim, plan, and outcome telemetry sufficient to reconstruct success.
+- Froze evaluation v3 with original exact denominators, nine zero-failure invariants,
+  and six mandatory adversarial probes.
+- Replaced the old remediation assertions with the exact 18-row second-review matrix.
+- Marked the tutorial `needs_retest` and all v0.3.0 claims `documented` pending fresh
+  independent review.
+
+This remains an unapproved draft. It is not a release or publication.
+
 ## 0.2.0 — 2026-09-01
 
 Gate 2 remediation after independent review of commit

@@ -60,20 +60,28 @@ cross-route evidence is contradictory and abstains. No match abstains to
 ## Replay, deadline, and stop
 
 Event ID is logical identity. A fingerprint binds timestamp, source, source version,
-reporter, subject, and body. SQLite transactions atomically claim intent across adapter
-instances. Exact replay returns the original semantic result; changed content under the
-same ID conflicts. Batch ordering is received time then event ID. Interrupted claims
-require owner marking before controlled recovery. Two failed attempts stop further work.
+reporter, subject, and body. SQLite transactions atomically claim intent across cooperating adapter processes sharing
+one local filesystem. `owner_run_id` fences every completion, finalization, and abort;
+a stale owner cannot overwrite a recovered owner. Exact replay returns only the finalized
+original semantic result; changed content under the same ID conflicts. Batch sort keys
+are validated inside a governed traced run before ordering by received time then event ID.
+Interrupted claims require owner marking before controlled recovery. Two failed attempts
+stop further work.
 
-A monotonic 30-second deadline and owner-controlled kill switch are checked at every
-boundary. Only Anushrut Gupta can activate/resume the switch; resume requires explicit
-reconciliation. Every activation/resume is audited.
+The global monotonic deadline is capped at 30 seconds; callers may shorten but never
+expand it. Declared authorize, validate, claim, plan, record, and recovery timeouts are
+enforced at their step fences. The owner-controlled kill switch carries an activation
+generation. Result completion is staged, the stop/deadline is checked again, and final
+ledger publication is serialized against activation. Only Anushrut Gupta can
+activate/resume the switch; resume requires the DurableLedger to verify that no
+executing, failed, cancelled, or staged entry remains. Every activation/resume is
+audited.
 
 ## State and telemetry governance
 
 The SQLite ledger retains minimal fingerprint/state/result data for seven days, with
-owner-only deletion, reset, and retention purge. Telemetry retains redacted transition,
-policy-decision, and retry events for 30 days; only tutorial-maintainer and
+owner-only deletion, reset, and retention purge. Telemetry retains redacted transition, policy-decision, claim, retry, plan, outcome,
+tool-inventory, and side-effect-inventory events for 30 days; only tutorial-maintainer and
 independent-reviewer roles may read or purge it. Telemetry loss stops visibly before
 authorization or routing and cannot authorize impact.
 
