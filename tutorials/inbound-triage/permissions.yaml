@@ -1,16 +1,17 @@
 tutorial_id: inbound-triage
 default_deny: true
 capabilities:
-  - id: read-event
+  - id: read-current-authorized-event
     operation: read
-    resource: one caller-authorized inbound event
+    resource: one supplied event whose id, source, reporter, and source-version metadata pass current trusted policy
     required: true
-    reason: The pilot must inspect subject and body to suggest a route.
+    reason: The pilot must inspect subject/body only after use-time per-record authorization to suggest a route.
 limits:
   max_items_per_run: 25
   max_runtime_seconds: 30
   network_hosts: []
 prohibited:
-  - create, update, delete, send, publish, approve, or admin operations
-  - wildcard or administrator scope
-  - fallback to another credential or identity
+  - create, update, delete, send, close, assign, publish, approve, or admin operations
+  - wildcard, administrator, additional write, or fallback scope
+  - fallback to another credential, identity, source policy, or stale policy version
+  - content-derived permission, approval, destination, or tool selection

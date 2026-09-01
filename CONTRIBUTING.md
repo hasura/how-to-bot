@@ -2,23 +2,33 @@
 
 ## Lifecycle
 
-1. **Proposal** — define outcome, non-goals, risk tier, affected systems, and evidence plan.
-2. **Draft** — add a neutral specification, at least one adapter, synthetic fixtures,
-   tests, failure cases, and claims manifest.
-3. **Automated checks** — run `uv run python tools/validate.py`,
-   `uv run python tools/check_links.py`, `uv run python tools/secret_scan.py`, and
-   `uv run pytest`.
-4. **Human review** — domain and reproducibility review; independent reproduction
-   for T2+; designated security review for T3.
-5. **Publish** — record version, evidence, supported adapters, limitations, and next review.
-6. **Maintain or retire** — retest after material changes or incidents; mark stale,
-   deprecate, or withdraw with cleanup guidance.
+1. **Proposal** — define outcome, non-goals, affected parties, risk tier, systems,
+   exact owners, and a predeclared evidence plan.
+2. **Draft** — add the neutral contract, adapter manifest, synthetic fixtures, frozen
+   thresholds, conformance/failure tests, claims, runbook, and changelog.
+3. **Automated checks** — run every command in the root README.
+4. **Human review** — domain and reliability review; non-author clean-room reproduction
+   whenever the applicable rubric requires it.
+5. **Publish** — only after every applicable blocker and threshold passes; record exact
+   version, evidence, limitations, owners, and next review.
+6. **Maintain or retire** — permission, policy, runtime, dependency, model, adapter, or
+   incident changes force `needs_retest` through the lifecycle invalidation rule.
 
-## Pull requests
+## Pull requests and reporting
 
-Keep one operational claim per claims entry. Use synthetic or explicitly approved,
-privacy-safe data. Never commit credentials, customer-derived records, private
-screenshots, or copied production logs. A tutorial PR must include the reviewer
-checklist from `TUTORIAL_STANDARD.md`.
+Keep one material operational claim per claims entry and use only the frozen claim-label
+taxonomy. Use synthetic or explicitly approved privacy-safe data. Never commit
+credentials, customer-derived records, private screenshots, or copied production logs.
+
+Ordinary defects and improvements:
+<https://github.com/hasura/how-to-bot/issues>.
+
+Sensitive vulnerabilities:
+<https://github.com/hasura/how-to-bot/security/advisories/new>.
+
+A tutorial PR must include the reviewer checklist, raw evaluation numerators and
+denominators, exact tool/runtime versions, and row-level remediation traceability for
+prior failures. Do not defer an applicable authorization, privacy, approval, recovery,
+observability, stop, or truthful-claims blocker as a follow-up.
 
 By contributing, you agree that your contribution is licensed under Apache-2.0.

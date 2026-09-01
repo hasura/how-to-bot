@@ -1,0 +1,64 @@
+reviewed_head: c88b8f9ba54c8a9feb9e06e281ed8cfd23820ca9
+rubric_version: howtobot.ai independent review contract v0.1
+rubric_changed: false
+failed_rows:
+  SCH-01:
+    changes: [strict lifecycle/changelog/adapter/tested-version schema, named accountable owners, cross-file validator]
+    tests: [tests/test_repository.py::test_manifest_contract_is_fully_resolved, tools/validate.py]
+  SCH-02:
+    changes: [schema-enforced preconditions, assumptions, affected parties, limitations, fixtures traceability]
+    tests: [tests/test_repository.py::test_outcome_contract_traces_to_tests]
+  SCH-03:
+    changes: [complete actor and data-flow map with reporter, classifications, tools, no-destination boundary, named owners]
+    tests: [tests/test_repository.py::test_actor_and_data_flow_contract_is_complete]
+  SCH-04:
+    changes: [six machine-readable step contracts with schemas, conditions, invariants, timeouts, errors, exits]
+    tests: [tests/test_repository.py::test_each_step_contract_is_complete, tutorials/inbound-triage/test_failure_injection.py]
+  EVD-01:
+    changes: [claim taxonomy aligned exactly to vendor_claim/documented/anecdotal/demonstrated/recurring/measured]
+    tests: [schemas/claims.schema.json, tools/validate.py]
+  PERM-02:
+    changes: [trusted requester context and current per-record/source/version/reporter authorization before content use]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_current_per_record_authorization_denies_without_content_leak, tutorials/inbound-triage/test_failure_injection.py::test_source_version_and_policy_version_drift_fail_closed]
+  APR-03:
+    changes: [Anushrut Gupta named as final-disposition and sensitive-exception owner; runtime cannot finalize]
+    tests: [tutorials/inbound-triage/test_conformance.py::test_sensitive_case_escalates_to_named_human, tests/test_repository.py::test_pilot_has_no_side_effects_and_is_draft]
+  STA-01:
+    changes: [complete state vocabulary, legal transition enforcement, visible terminal/reconciled histories]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_state_machine_contract_contains_all_frozen_states, tutorials/inbound-triage/test_failure_injection.py::test_success_denial_failure_cancel_and_recovery_can_be_reconstructed]
+  STA-02:
+    changes: [SQLite state ownership/retention/access/deletion/reset/ordering/concurrency contract]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_concurrent_exact_replay_is_atomic, tutorials/inbound-triage/test_failure_injection.py::test_ledger_delete_and_reset_are_owner_controlled, tutorials/inbound-triage/test_failure_injection.py::test_ledger_retention_is_owner_enforced]
+  STA-03:
+    changes: [atomic durable event-intent claims, conflict detection, serial/concurrent/reordered/interrupted replay handling]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_serial_exact_replay_reuses_one_semantic_outcome, tutorials/inbound-triage/test_failure_injection.py::test_concurrent_exact_replay_is_atomic, tutorials/inbound-triage/test_failure_injection.py::test_same_event_identity_changed_content_is_conflict, tutorials/inbound-triage/test_failure_injection.py::test_reordered_batch_has_deterministic_order, tutorials/inbound-triage/test_failure_injection.py::test_durable_interrupted_claim_recovers_after_adapter_restart]
+  FUN-01:
+    changes: [predeclared evaluation.yaml, versioned seven-case representative set, raw numerator/denominator report, zero-failure invariants]
+    tests: [tutorials/inbound-triage/evaluate.py, tutorials/inbound-triage/test_evaluation.py]
+  FUN-02:
+    changes: [exact source/version/field/span/hash citations, extracted-fact versus inference model, grounded suggested resolution]
+    tests: [tutorials/inbound-triage/test_conformance.py::test_correct_routes_and_exact_grounding, tutorials/inbound-triage/test_conformance.py::test_prompt_injection_is_only_data_and_abstains]
+  FUN-03:
+    changes: [strict time validation/freshness, tied-evidence conflict abstention, unsupported abstention, sensitive owner handoff]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_stale_malformed_and_future_timestamps_fail_closed, tutorials/inbound-triage/test_evaluation.py]
+  OBS-01:
+    changes: [redacted run/correlation/requester/operator/policy transition, decision, retry, terminal, and recovery events]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_success_denial_failure_cancel_and_recovery_can_be_reconstructed, tutorials/inbound-triage/test_failure_injection.py::test_failed_retry_recovery_and_repeated_error_stop_are_reconstructable]
+  OBS-02:
+    changes: [telemetry ACL, retention purge, redaction, and fail-visible loss behavior]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_telemetry_loss_is_visible_and_safe, tutorials/inbound-triage/test_failure_injection.py::test_telemetry_redacts_untrusted_content, tutorials/inbound-triage/test_failure_injection.py::test_telemetry_acl_and_retention_are_enforced]
+  FAIL-01:
+    changes: [expanded adversarial suite for stale/conflict/revocation/reorder/concurrency/drift/deadline/mid-run stop/recovery/telemetry loss]
+    tests: [tutorials/inbound-triage/test_failure_injection.py, tutorials/inbound-triage/FAILURE_TEST_MATRIX.md]
+  FAIL-02:
+    changes: [monotonic runtime deadline and two-failure repeated-error stop; dependency retries remain N/A]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_runtime_deadline_is_enforced, tutorials/inbound-triage/test_failure_injection.py::test_failed_retry_recovery_and_repeated_error_stop_are_reconstructable]
+  KILL-01:
+    changes: [owner-controlled independent auditable switch, mid-run checks, reconciliation-gated resume]
+    tests: [tutorials/inbound-triage/test_failure_injection.py::test_idle_and_midrun_kill_switch_and_controlled_resume]
+  MNT-01:
+    changes: [named owners, exact tested matrix, issue/security paths, material-change invalidation and retire/migrate procedure]
+    tests: [tests/test_lifecycle.py, tests/test_repository.py::test_manifest_contract_is_fully_resolved]
+  MNT-02:
+    changes: [all 20 applicable blockers addressed in runtime/schema/tests/docs; only explicit adapter limitations remain]
+    tests: [tools/validate.py, tutorials/inbound-triage/remediation.yaml, complete canonical validation suite]

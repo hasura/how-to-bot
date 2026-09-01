@@ -1,64 +1,231 @@
 id: inbound-triage
 title: Inbound triage with suggested resolution and routing
-version: 0.1.0
+version: 0.2.0
 status: draft
 license: Apache-2.0
+changelog: CHANGELOG.md
+adapters: [local-python]
+tested_versions:
+  local-python-adapter: 0.2.0
+  python: 3.14.4
+  uv: 0.12.8
+  jsonschema: 4.25.1
+  PyYAML: 6.0.2
+  pytest: 8.4.1
+  ruff: 0.12.11
+  fixture-set: inbound-triage-eval-v2
 risk:
   tier: T1
-  rationale: Bounded processing of authorized inbound text into a private draft; no external write, send, or final disposition.
+  rationale: Bounded current-policy-authorized synthetic reads produce private drafts only; no network, external destination, write, send, or final disposition exists.
+  data_class: synthetic inbound text; the reference contract treats live inbound text as confidential
+  audience: authorized local operator and named human disposition owner
+  capabilities: [read one current-policy-authorized supplied record, create an in-process private draft]
+  side_effects: []
 lifecycle:
-  maintainer: repository-steward
-  domain_owner: tutorial-domain-reviewer
-  security_reviewer: null
+  maintainer: Anushrut Gupta
+  domain_owner: Anushrut Gupta
+  reliability_reviewer: Independent reviewer bot 372780cd-861e-43a3-8b37-939b82cfa693
+  security_exception_owner: Anushrut Gupta
   created: "2026-08-31"
-  last_verified: "2026-08-31"
-  next_review: "2027-08-31"
+  last_verified: "2026-09-01"
+  next_review: "2027-09-01"
+  issue_path: https://github.com/hasura/how-to-bot/issues
+  security_report_path: https://github.com/hasura/how-to-bot/security/advisories/new
+  retest_required: false
+  retest_reason: null
+  material_change_triggers: [permission, policy, runtime, dependency, model, adapter, incident]
+  retire_migrate_procedure: Mark stale material needs_retest immediately; deprecate or withdraw unsupported versions and document replacement or teardown in the changelog.
 outcome:
-  job: Classify an inbound item and suggest a queue while preserving evidence and human ownership.
-  users: [support, operations, finance, recruiting]
+  job: Validate one authorized inbound item and suggest a private draft queue with exact evidence while preserving human final disposition.
+  users: [support operator, operations operator, finance operator, recruiting operator]
   non_goals:
-    - Send a response
-    - Close, update, or create an external record
-    - Make a high-stakes or final disposition
-  inputs: [synthetic inbound event]
-  outputs: [private draft route suggestion, reason codes, source-field citations]
+    - Send a response or alert.
+    - Close, assign, update, create, or publish an external record.
+    - Make a high-stakes or final disposition.
+    - Claim production routing accuracy or live-source compatibility.
+  preconditions:
+    - Trusted adapter context identifies requester and operator.
+    - Current policy version grants the requester the exact record and source.
+    - Exact inbound_events:read scope is active with no broader scope.
+    - Kill switch is inactive and reconciled.
+    - Redacted telemetry is available.
+  inputs:
+    - Versioned synthetic inbound event with id, timestamp, source, source version, reporter, subject, and body.
+    - Trusted request context and current authorization policy.
+  outputs:
+    - Private draft route suggestion or explicit abstention.
+    - Exact source/version/field/span evidence and separated extracted facts versus inference.
+    - Structured redacted transition and policy history.
   side_effects: []
   success_criteria:
-    - Known synthetic cases route according to deterministic policy.
-    - Every suggestion cites the source fields used.
-    - Sensitive cases escalate to security and remain human-owned.
-    - Exact replay does not produce a second semantic result.
+    - Frozen ordinary cases route according to deterministic policy.
+    - Unsupported and contradictory cases abstain.
+    - Sensitive cases escalate to security and remain owned by Anushrut Gupta.
+    - Serial, concurrent, reordered, and recovered replay yield one semantic outcome.
+    - Denied, failed, cancelled, retried, succeeded, and recovered histories are reconstructable.
   unacceptable_outcomes:
-    - Source text changes permissions or authorizes a side effect.
-    - A suggestion is sent or committed without human action.
-    - Missing permission silently falls back to a broader identity.
+    - Source text changes permissions, policy, recipients, tools, approval, or impact.
+    - Unauthorized or revoked records reveal content or produce a suggestion.
+    - Same event identity with changed content produces a second semantic outcome.
+    - Stale, malformed, conflicting, or unsupported input is silently treated as ordinary.
+    - Work continues after deadline or kill-switch activation.
+    - A suggestion is sent, committed, or finalized automatically.
+  assumptions:
+    - Adapter-supplied request context and policy are trusted test doubles for current source authorization.
+    - Python process memory is private to this bounded local demonstration.
+    - Source versions are immutable identifiers supplied by the source adapter.
+  affected_parties:
+    - Synthetic reporter represented by each fixture.
+    - Authorized requester/operator.
+    - Anushrut Gupta as final-disposition and sensitive-exception owner.
+  limitations:
+    - No live source, credential, model, network, recurring trigger, or external destination is included.
+    - In-memory state is concurrency-safe within one process but is not cross-process durable.
+    - Keyword routing is illustrative and not a production classifier.
+    - Awaiting-approval and partial-side-effect paths are present in the neutral state vocabulary but unreachable in this T1 no-write adapter.
 actors:
-  - name: requester
-    responsibility: Supplies an authorized inbound event.
-  - name: operator
-    responsibility: Runs bounded deterministic policy and receives the private draft.
-  - name: human-disposition-owner
-    responsibility: Accepts, changes, or rejects the suggestion outside this pilot.
-  - name: source-system-owner
-    responsibility: Controls access to inbound events.
+  - id: requester
+    kind: requester
+    identity: synthetic-user-operator
+    responsibility: Requests only records granted by current source policy.
+    trust: trusted
+  - id: operator
+    kind: operator
+    identity: synthetic-operator
+    responsibility: Invokes the bounded adapter and reviews its private draft.
+    trust: trusted
+  - id: final-disposition-owner
+    kind: approver
+    identity: Anushrut Gupta
+    responsibility: Accepts, changes, or rejects normal and sensitive suggestions outside this no-write pilot.
+    trust: trusted
+  - id: source-owner
+    kind: data_owner
+    identity: Anushrut Gupta
+    responsibility: Owns the example authorization policy and revocation decisions.
+    trust: trusted
+  - id: reporter
+    kind: affected_party
+    identity: synthetic fixture reporter
+    responsibility: Is represented by the supplied event and may be affected by a future disposition.
+    trust: untrusted
+  - id: deterministic-runtime
+    kind: tool
+    identity: local-python adapter 0.2.0 on Python 3.14.4
+    responsibility: Enforces policy, state, deadline, replay, grounding, telemetry, and stop controls.
+    trust: trusted
+  - id: external-destination
+    kind: destination
+    identity: none in T1 adapter
+    responsibility: No destination exists and no external action is possible.
+    trust: not_applicable
+data_flow:
+  assets: [inbound content, reporter privacy, routing integrity, authorization policy, human disposition authority, replay state, audit history]
+  classifications: [synthetic-public fixture metadata, confidential inbound content model, redacted operational telemetry]
+  untrusted_inputs: [event subject, event body, event timestamp, event source assertions]
+  tools: [local-python adapter 0.2.0, concurrency-safe in-memory ledger, redacted telemetry sink, owner-controlled kill switch]
+  destination: private in-process draft returned to the authorized operator; no external destination
+  boundaries:
+    - Untrusted event metadata is checked against trusted current policy before subject/body validation or routing.
+    - Untrusted text crosses into deterministic keyword policy as data only.
+    - Results cross into redacted telemetry without raw text.
+    - Final disposition remains outside the adapter with Anushrut Gupta.
 workflow:
-  trigger: Explicit local invocation with a versioned JSON fixture.
-  termination: [succeeded, failed, cancelled]
-  states: [received, validated, planned, executing, succeeded, failed, cancelled]
+  trigger: Explicit local invocation with a versioned synthetic event and trusted request context.
+  termination: [succeeded, failed, cancelled, reconciled]
+  states: [received, validated, planned, awaiting_approval, executing, succeeded, partially_succeeded, failed, cancelled, reconciled]
   invariants:
-    - Output status is always draft.
-    - requires_human_disposition is always true.
-    - No network or write capability exists.
-    - Only the exact inbound_events:read scope is accepted.
+    - Output status is always draft and requires_human_disposition is true.
+    - No network, destination, write, send, close, assign, or publication capability exists.
+    - Authorization uses requester identity, current policy version, source, record, and reporter before content use.
+    - Every execution boundary enforces the deadline and independent kill switch.
+    - Telemetry contains identifiers and codes but no raw subject or body.
+  steps:
+    - id: authorize-record
+      input_schema: trusted RequestContext plus event id/source/reporter/source_version metadata
+      output_schema: authorized policy decision
+      preconditions: [telemetry available, kill switch inactive, deadline unexpired]
+      postconditions: [requester has exact scope and current source/record/reporter grant]
+      invariants: [subject and body are not consulted or logged before authorization]
+      timeout_seconds: 5
+      error_classes: [authorization, cancelled, deadline_exceeded, telemetry_unavailable]
+      exit_conditions: [continue to validate-event, terminal failed, terminal cancelled]
+    - id: validate-event
+      input_schema: authorized versioned event
+      output_schema: normalized timezone-aware event metadata
+      preconditions: [authorize-record succeeded]
+      postconditions: [required fields, format, size, freshness, and future-skew checks passed]
+      invariants: [stale or malformed input never reaches routing]
+      timeout_seconds: 5
+      error_classes: [validation, policy, cancelled, deadline_exceeded]
+      exit_conditions: [continue to claim-intent, terminal failed, terminal cancelled]
+    - id: claim-intent
+      input_schema: event identity and content fingerprint
+      output_schema: owner, duplicate, conflict, or recovery claim
+      preconditions: [validate-event succeeded]
+      postconditions: [one process-local owner exists for each event identity and immutable fingerprint]
+      invariants: [changed-content replay conflicts; concurrent exact replay waits and reuses the original]
+      timeout_seconds: 10
+      error_classes: [conflict, repeated_error_stop, deadline_exceeded, cancelled]
+      exit_conditions: [continue to plan-route, return original outcome, terminal failed, terminal cancelled]
+    - id: plan-route
+      input_schema: authorized validated untrusted subject and body
+      output_schema: deterministic matches, exact evidence spans, confidence, and abstention decision
+      preconditions: [claim-intent ownership acquired]
+      postconditions: [supported route or explicit abstention exists]
+      invariants: [untrusted text cannot alter policy; tied or unsupported routes abstain; sensitive terms escalate]
+      timeout_seconds: 5
+      error_classes: [policy, cancelled, deadline_exceeded]
+      exit_conditions: [continue to record-draft, terminal failed, terminal cancelled]
+    - id: record-draft
+      input_schema: grounded route plan
+      output_schema: TriageResult private draft and structured telemetry
+      preconditions: [plan-route succeeded, kill switch inactive, deadline unexpired]
+      postconditions: [ledger stores one semantic result and succeeded transition is visible]
+      invariants: [raw subject/body are absent; named human disposition remains mandatory; no side effect occurs]
+      timeout_seconds: 5
+      error_classes: [policy, telemetry_unavailable, cancelled, deadline_exceeded]
+      exit_conditions: [terminal succeeded, terminal failed, terminal cancelled]
+    - id: recover-run
+      input_schema: prior failed or cancelled ledger identity plus controlled resume
+      output_schema: retried trace and reconciled terminal state
+      preconditions: [failure is below repeated-error threshold, stop state is reconciled, policy is current]
+      postconditions: [recovery is visible and semantic outcome remains singular]
+      invariants: [resume requires owner action and reconciliation; no impact exists to compensate]
+      timeout_seconds: 30
+      error_classes: [repeated_error_stop, conflict, authorization, cancelled, deadline_exceeded]
+      exit_conditions: [terminal reconciled, terminal failed, terminal cancelled]
+state_governance:
+  location: process-local InMemoryLedger containing event identity, SHA-256 fingerprint, state, failure count, and redacted result
+  owner: Anushrut Gupta
+  retention_days: 7
+  access: [tutorial operator through adapter API, independent reviewer through tests]
+  deletion: Owner-only delete(event_id) removes one entry and is regression tested.
+  reset: Owner-only reset() clears all entries and is regression tested.
+  ordering: Batch processing sorts received_at ascending then event id.
+  concurrency: Lock plus per-entry condition provides atomic ownership; exact concurrent replay waits, changed-content replay conflicts.
+observability:
+  events: [transition, policy_decision, retry]
+  identities: [run_id, correlation_id, event_id, requester_id, operator_id, policy_version]
+  redaction: [omit subject/body and evidence text, store only reason/state codes and identifiers, reject unsafe telemetry fields]
+  retention_days: 30
+  access: [tutorial-maintainer, independent-reviewer]
+  loss_behavior: Telemetry unavailability stops before authorization/routing and raises a visible telemetry_unavailable error; it cannot authorize impact.
 evaluation:
-  fixtures: fixtures/events.json
+  fixture_version: inbound-triage-eval-v2
+  fixtures: fixtures/evaluation.json
+  thresholds: evaluation.yaml
   commands:
+    - uv run python tutorials/inbound-triage/evaluate.py
     - uv run pytest tutorials/inbound-triage
-    - uv run python tutorials/inbound-triage/run.py tutorials/inbound-triage/fixtures/events.json
   critical_invariants:
-    - No source content can grant permissions.
-    - Sensitive cases route to security.
-    - Duplicate replay is explicitly marked.
+    - authorization_failures
+    - privacy_leaks
+    - automatic_final_dispositions
+    - duplicate_semantic_outcomes
+    - unsupported_non_abstentions
+    - missed_sensitive_escalations
+    - deadline_or_kill_switch_bypasses
 files:
   spec: SPEC.md
   threat_model: THREAT_MODEL.md
@@ -66,4 +233,7 @@ files:
   permissions: permissions.yaml
   approvals: approvals.yaml
   claims: claims.yaml
+  evaluation: evaluation.yaml
   adapter: adapters/local-python/adapter.yaml
+  changelog: CHANGELOG.md
+  failure_matrix: FAILURE_TEST_MATRIX.md

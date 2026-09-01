@@ -2,14 +2,51 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime, timedelta, timezone
 import hashlib
+import json
+from pathlib import Path
 import re
-from typing import Any
+import sqlite3
+import tempfile
+import threading
+import time
+from typing import Any, Callable
+from uuid import uuid4
 
 MAX_ITEMS_PER_RUN = 25
 MAX_TEXT_LENGTH = 4_000
+MAX_RUNTIME_SECONDS = 30.0
+MAX_EVENT_AGE = timedelta(days=7)
+MAX_FUTURE_SKEW = timedelta(minutes=5)
 REQUIRED_SCOPE = "inbound_events:read"
+DEFAULT_EVALUATION_TIME = datetime(2026, 9, 1, 20, 0, tzinfo=timezone.utc)
+
+WORKFLOW_STATES = {
+    "received",
+    "validated",
+    "planned",
+    "awaiting_approval",
+    "executing",
+    "succeeded",
+    "partially_succeeded",
+    "failed",
+    "cancelled",
+    "reconciled",
+}
+_ALLOWED_TRANSITIONS = {
+    "received": {"validated", "failed", "cancelled"},
+    "validated": {"planned", "failed", "cancelled"},
+    "planned": {"awaiting_approval", "executing", "failed", "cancelled"},
+    "awaiting_approval": {"executing", "failed", "cancelled"},
+    "executing": {"succeeded", "partially_succeeded", "failed", "cancelled"},
+    "succeeded": {"reconciled"},
+    "partially_succeeded": {"reconciled", "failed"},
+    "failed": {"reconciled"},
+    "cancelled": {"reconciled"},
+    "reconciled": set(),
+}
 
 ROUTES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("security", ("breach", "credential", "phishing", "security", "vulnerability")),
@@ -20,9 +57,13 @@ SENSITIVE_TERMS = ("credential", "password", "secret", "ssn", "social security",
 
 
 class TriageError(Exception):
-    """Base class with a stable machine-readable error code."""
+    """Base class with a stable machine-readable error code and run identifier."""
 
     code = "unknown"
+
+    def __init__(self, message: str, *, run_id: str | None = None):
+        super().__init__(message)
+        self.run_id = run_id
 
 
 class ValidationError(TriageError):
@@ -37,135 +78,770 @@ class PolicyError(TriageError):
     code = "policy"
 
 
+class ConflictError(TriageError):
+    code = "conflict"
+
+
+class DeadlineExceededError(TriageError):
+    code = "deadline_exceeded"
+
+
+class RepeatedErrorStop(TriageError):
+    code = "repeated_error_stop"
+
+
+class TelemetryUnavailableError(TriageError):
+    code = "telemetry_unavailable"
+
+
 class CancelledError(TriageError):
     code = "cancelled"
 
 
 @dataclass(frozen=True)
+class RequestContext:
+    """Trusted invocation context supplied by the adapter, never by inbound content."""
+
+    requester_id: str
+    operator_id: str
+    granted_scopes: frozenset[str]
+    policy_version: str
+
+
+@dataclass(frozen=True)
+class AuthorizationPolicy:
+    """Current source policy used at the point of record access."""
+
+    version: str
+    record_grants: dict[str, frozenset[str]]
+    source_grants: dict[str, frozenset[str]]
+    record_versions: dict[str, str]
+    revoked_requesters: frozenset[str] = frozenset()
+    active: bool = True
+
+    def authorize(self, context: RequestContext, metadata: dict[str, str]) -> None:
+        if not self.active or context.policy_version != self.version:
+            raise AuthorizationError("current authorization policy is unavailable or changed")
+        if context.requester_id in self.revoked_requesters:
+            raise AuthorizationError("requester access is revoked")
+        if context.granted_scopes != frozenset({REQUIRED_SCOPE}):
+            raise AuthorizationError("exact inbound-events read scope is required")
+        record_ids = self.record_grants.get(context.requester_id, frozenset())
+        sources = self.source_grants.get(context.requester_id, frozenset())
+        if metadata["id"] not in record_ids or metadata["source"] not in sources:
+            raise AuthorizationError("record is not authorized for requester")
+        if self.record_versions.get(metadata["id"]) != metadata["source_version"]:
+            raise AuthorizationError("record source version is not authorized")
+        if metadata["reporter"] != context.requester_id:
+            raise AuthorizationError("record ownership does not match requester")
+
+
+@dataclass(frozen=True)
+class TelemetryEvent:
+    sequence: int
+    run_id: str
+    correlation_id: str
+    event_id: str
+    requester_id: str
+    operator_id: str
+    kind: str
+    state: str
+    code: str
+    timestamp: str
+    policy_version: str
+
+
+class TelemetrySink:
+    """Redacted in-memory audit sink with explicit access and retention metadata."""
+
+    retention_days = 30
+    access_roles = frozenset({"tutorial-maintainer", "independent-reviewer"})
+    redacted_fields = frozenset({"subject", "body", "secret", "password", "token"})
+
+    def __init__(self, *, available: bool = True) -> None:
+        self.available = available
+        self._lock = threading.Lock()
+        self._events: list[TelemetryEvent] = []
+        self._sequence = 0
+
+    def emit(self, event: TelemetryEvent) -> None:
+        if not self.available:
+            raise TelemetryUnavailableError(
+                "telemetry unavailable; run stopped in visible degraded mode"
+            )
+        serialized = repr(asdict(event)).casefold()
+        if any(field in serialized for field in ("password=", "token=", "secret=")):
+            raise PolicyError("telemetry redaction invariant failed")
+        with self._lock:
+            self._sequence += 1
+            self._events.append(replace(event, sequence=self._sequence))
+
+    def events_for(self, run_id: str, *, actor_role: str) -> list[dict[str, Any]]:
+        self._authorize_reader(actor_role)
+        with self._lock:
+            return [asdict(item) for item in self._events if item.run_id == run_id]
+
+    def all_events(self, *, actor_role: str) -> list[dict[str, Any]]:
+        self._authorize_reader(actor_role)
+        with self._lock:
+            return [asdict(item) for item in self._events]
+
+    def purge_expired(self, *, actor_role: str, now: datetime) -> int:
+        self._authorize_reader(actor_role)
+        cutoff = now.astimezone(timezone.utc) - timedelta(days=self.retention_days)
+        with self._lock:
+            before = len(self._events)
+            self._events = [
+                item for item in self._events if _parse_timestamp(item.timestamp) >= cutoff
+            ]
+            return before - len(self._events)
+
+    def _authorize_reader(self, actor_role: str) -> None:
+        if actor_role not in self.access_roles:
+            raise AuthorizationError("telemetry access denied")
+
+
+@dataclass(frozen=True)
+class KillSwitchAudit:
+    sequence: int
+    action: str
+    actor_id: str
+    reason: str
+    timestamp: str
+
+
+class KillSwitch:
+    """Owner-controlled stop checked at every execution boundary."""
+
+    def __init__(self, *, owner_id: str) -> None:
+        self.owner_id = owner_id
+        self._active = False
+        self._reconciliation_required = False
+        self._lock = threading.Lock()
+        self._audit: list[KillSwitchAudit] = []
+
+    @property
+    def active(self) -> bool:
+        with self._lock:
+            return self._active
+
+    def activate(self, *, actor_id: str, reason: str) -> None:
+        self._require_owner(actor_id)
+        with self._lock:
+            self._active = True
+            self._reconciliation_required = True
+            self._audit.append(
+                KillSwitchAudit(
+                    len(self._audit) + 1,
+                    "activated",
+                    actor_id,
+                    reason,
+                    _utc_now_text(),
+                )
+            )
+
+    def resume(self, *, actor_id: str, reconciled: bool, reason: str) -> None:
+        self._require_owner(actor_id)
+        if not reconciled:
+            raise PolicyError("controlled resume requires reconciliation")
+        with self._lock:
+            self._active = False
+            self._reconciliation_required = False
+            self._audit.append(
+                KillSwitchAudit(
+                    len(self._audit) + 1,
+                    "resumed",
+                    actor_id,
+                    reason,
+                    _utc_now_text(),
+                )
+            )
+
+    def check(self, *, run_id: str) -> None:
+        with self._lock:
+            if self._active or self._reconciliation_required:
+                raise CancelledError("kill switch is active; reconciliation required", run_id=run_id)
+
+    def audit_log(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [asdict(item) for item in self._audit]
+
+    def _require_owner(self, actor_id: str) -> None:
+        if actor_id != self.owner_id:
+            raise AuthorizationError("only the kill-switch owner may change stop state")
+
+
+@dataclass(frozen=True)
+class EvidenceSpan:
+    source: str
+    source_version: str
+    field: str
+    start: int
+    end: int
+    text_sha256: str
+
+
+@dataclass(frozen=True)
 class TriageResult:
     event_id: str
+    source_version: str
     status: str
     suggested_route: str
+    suggested_resolution: str | None
     reason_codes: tuple[str, ...]
-    citations: tuple[str, ...]
+    evidence: tuple[EvidenceSpan, ...]
+    extracted_facts: tuple[dict[str, Any], ...]
+    inference: dict[str, Any]
     confidence: float
     requires_human_disposition: bool
+    disposition_owner: str
     sensitive_case: bool
+    abstained: bool
     duplicate: bool
     idempotency_key: str
+    run_id: str
+    terminal_state: str
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
-        for key in ("reason_codes", "citations"):
-            result[key] = list(result[key])
+        result["reason_codes"] = list(self.reason_codes)
+        result["evidence"] = [asdict(item) for item in self.evidence]
+        result["extracted_facts"] = list(self.extracted_facts)
         return result
 
 
-class InMemoryLedger:
-    """Example replay ledger. A durable adapter must replace this for real events."""
+class DurableLedger:
+    """SQLite replay ledger with atomic claims and controlled interruption recovery."""
 
-    def __init__(self) -> None:
-        self._results: dict[str, TriageResult] = {}
+    retention_days = 7
+    owner = "Anushrut Gupta"
+    access_roles = frozenset({"tutorial-operator", "independent-reviewer"})
+    ordering = "received_at ascending, then event id"
 
-    def get(self, key: str) -> TriageResult | None:
-        return self._results.get(key)
+    def __init__(self, path: str | Path | None = None, *, max_failures: int = 2) -> None:
+        if path is None:
+            handle = tempfile.NamedTemporaryFile(prefix="howtobot-ledger-", suffix=".sqlite3", delete=False)
+            handle.close()
+            path = handle.name
+        self.path = str(path)
+        self.max_failures = max_failures
+        self._schema_lock = threading.Lock()
+        self._initialize()
 
-    def record(self, key: str, result: TriageResult) -> None:
-        self._results[key] = result
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.path, timeout=1.0, isolation_level=None)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _initialize(self) -> None:
+        with self._schema_lock, self._connect() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS triage_ledger (
+                    event_id TEXT PRIMARY KEY,
+                    fingerprint TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    result_json TEXT,
+                    failures INTEGER NOT NULL DEFAULT 0,
+                    owner_run_id TEXT,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+
+    @staticmethod
+    def _deserialize_result(payload: str) -> TriageResult:
+        data = json.loads(payload)
+        data["reason_codes"] = tuple(data["reason_codes"])
+        data["evidence"] = tuple(EvidenceSpan(**item) for item in data["evidence"])
+        data["extracted_facts"] = tuple(data["extracted_facts"])
+        return TriageResult(**data)
+
+    def claim(
+        self,
+        *,
+        event_id: str,
+        fingerprint: str,
+        run_id: str,
+        deadline: float,
+    ) -> tuple[str, TriageResult | None, bool]:
+        """Atomically claim new/recoverable intent or wait for an exact concurrent owner."""
+        while True:
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    "SELECT * FROM triage_ledger WHERE event_id = ?", (event_id,)
+                ).fetchone()
+                now = _utc_now_text()
+                if row is None:
+                    connection.execute(
+                        """
+                        INSERT INTO triage_ledger
+                        (event_id, fingerprint, state, failures, owner_run_id, updated_at)
+                        VALUES (?, ?, 'executing', 0, ?, ?)
+                        """,
+                        (event_id, fingerprint, run_id, now),
+                    )
+                    connection.commit()
+                    return "owner", None, False
+                if row["fingerprint"] != fingerprint:
+                    connection.rollback()
+                    raise ConflictError("event identity was replayed with changed content")
+                if row["state"] in {"succeeded", "reconciled"} and row["result_json"]:
+                    result = self._deserialize_result(row["result_json"])
+                    connection.commit()
+                    return "duplicate", result, False
+                if row["state"] in {"failed", "cancelled", "reconciled"}:
+                    if row["failures"] >= self.max_failures:
+                        connection.rollback()
+                        raise RepeatedErrorStop("repeated-error stop threshold reached")
+                    connection.execute(
+                        """
+                        UPDATE triage_ledger
+                        SET state = 'executing', owner_run_id = ?, updated_at = ?
+                        WHERE event_id = ?
+                        """,
+                        (run_id, now, event_id),
+                    )
+                    connection.commit()
+                    return "owner", None, True
+                connection.commit()
+            if time.monotonic() > deadline:
+                raise DeadlineExceededError("deadline exceeded waiting for concurrent replay")
+            time.sleep(min(0.005, max(deadline - time.monotonic(), 0)))
+
+    def complete(self, event_id: str, result: TriageResult) -> None:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                """
+                UPDATE triage_ledger
+                SET state = 'succeeded', result_json = ?, owner_run_id = NULL, updated_at = ?
+                WHERE event_id = ?
+                """,
+                (json.dumps(result.to_dict(), sort_keys=True), _utc_now_text(), event_id),
+            )
+            if cursor.rowcount != 1:
+                connection.rollback()
+                raise PolicyError("ledger completion lost its atomic claim")
+            connection.commit()
+
+    def abort(self, event_id: str, state: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE triage_ledger
+                SET state = ?, failures = failures + 1, owner_run_id = NULL, updated_at = ?
+                WHERE event_id = ?
+                """,
+                (state, _utc_now_text(), event_id),
+            )
+
+    def mark_interrupted_for_recovery(self, event_id: str, *, actor_id: str) -> None:
+        self._require_owner(actor_id)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT state FROM triage_ledger WHERE event_id = ?", (event_id,)
+            ).fetchone()
+            if row is None or row["state"] != "executing":
+                connection.rollback()
+                raise PolicyError("only an executing intent may be marked interrupted")
+            connection.execute(
+                """
+                UPDATE triage_ledger
+                SET state = 'failed', failures = failures + 1, owner_run_id = NULL, updated_at = ?
+                WHERE event_id = ?
+                """,
+                (_utc_now_text(), event_id),
+            )
+            connection.commit()
+
+    def reconcile(self, event_id: str) -> None:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE triage_ledger SET state = 'reconciled', updated_at = ?
+                WHERE event_id = ? AND state IN ('failed', 'cancelled', 'succeeded')
+                """,
+                (_utc_now_text(), event_id),
+            )
+            if cursor.rowcount != 1:
+                raise PolicyError("only terminal ledger entries can be reconciled")
+
+    def delete(self, event_id: str, *, actor_id: str) -> None:
+        self._require_owner(actor_id)
+        with self._connect() as connection:
+            connection.execute("DELETE FROM triage_ledger WHERE event_id = ?", (event_id,))
+
+    def reset(self, *, actor_id: str) -> None:
+        self._require_owner(actor_id)
+        with self._connect() as connection:
+            connection.execute("DELETE FROM triage_ledger")
+
+    def snapshot(self, *, actor_role: str) -> dict[str, str]:
+        if actor_role not in self.access_roles:
+            raise AuthorizationError("ledger state access denied")
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT event_id, state FROM triage_ledger ORDER BY event_id"
+            ).fetchall()
+        return {row["event_id"]: row["state"] for row in rows}
+
+    def purge_expired(self, *, actor_id: str, now: datetime) -> int:
+        self._require_owner(actor_id)
+        cutoff = now.astimezone(timezone.utc) - timedelta(days=self.retention_days)
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM triage_ledger WHERE updated_at < ?",
+                (cutoff.isoformat().replace("+00:00", "Z"),),
+            )
+            return cursor.rowcount
+
+    def close_and_delete(self, *, actor_id: str) -> None:
+        self._require_owner(actor_id)
+        Path(self.path).unlink(missing_ok=True)
+
+    def _require_owner(self, actor_id: str) -> None:
+        if actor_id != self.owner:
+            raise AuthorizationError("only ledger owner may change durable state")
 
 
-def _validate_event(event: dict[str, Any]) -> None:
-    required = ("id", "received_at", "source", "subject", "body")
+class _RunTrace:
+    def __init__(
+        self,
+        *,
+        telemetry: TelemetrySink,
+        run_id: str,
+        correlation_id: str,
+        event_id: str,
+        context: RequestContext,
+    ) -> None:
+        self.telemetry = telemetry
+        self.run_id = run_id
+        self.correlation_id = correlation_id
+        self.event_id = event_id
+        self.context = context
+        self.state = "received"
+        self.emit("transition", "received")
+
+    def emit(self, kind: str, code: str) -> None:
+        self.telemetry.emit(
+            TelemetryEvent(
+                sequence=0,
+                run_id=self.run_id,
+                correlation_id=self.correlation_id,
+                event_id=self.event_id,
+                requester_id=self.context.requester_id,
+                operator_id=self.context.operator_id,
+                kind=kind,
+                state=self.state,
+                code=code,
+                timestamp=_utc_now_text(),
+                policy_version=self.context.policy_version,
+            )
+        )
+
+    def transition(self, state: str, code: str = "ok") -> None:
+        if state not in WORKFLOW_STATES:
+            raise PolicyError(f"unknown state: {state}", run_id=self.run_id)
+        if state not in _ALLOWED_TRANSITIONS[self.state]:
+            raise PolicyError(
+                f"illegal transition: {self.state} -> {state}", run_id=self.run_id
+            )
+        self.state = state
+        self.emit("transition", code)
+
+
+def _utc_now_text() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _metadata(event: dict[str, Any]) -> dict[str, str]:
+    names = ("id", "source", "reporter", "source_version")
+    if any(not isinstance(event.get(name), str) or not event[name] for name in names):
+        raise ValidationError("missing authorization metadata")
+    return {name: event[name] for name in names}
+
+
+def _parse_timestamp(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("received_at must be an RFC3339 timestamp") from exc
+    if parsed.tzinfo is None:
+        raise ValidationError("received_at must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def _validate_event(event: dict[str, Any], *, evaluation_time: datetime) -> datetime:
+    required = (
+        "id",
+        "received_at",
+        "source",
+        "source_version",
+        "subject",
+        "body",
+        "reporter",
+    )
     missing = [name for name in required if not isinstance(event.get(name), str) or not event[name]]
     if missing:
         raise ValidationError(f"missing or invalid fields: {', '.join(missing)}")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", event["id"]):
         raise ValidationError("event id has an invalid format")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}", event["source_version"]):
+        raise ValidationError("source_version has an invalid format")
     if len(event["subject"]) > MAX_TEXT_LENGTH or len(event["body"]) > MAX_TEXT_LENGTH:
         raise PolicyError("event text exceeds the configured limit")
+    received = _parse_timestamp(event["received_at"])
+    if evaluation_time.tzinfo is None:
+        raise PolicyError("evaluation_time must be timezone-aware")
+    if evaluation_time - received > MAX_EVENT_AGE:
+        raise PolicyError("event is stale and requires deterministic exception routing")
+    if received - evaluation_time > MAX_FUTURE_SKEW:
+        raise PolicyError("event timestamp is too far in the future")
+    return received
 
 
-def _idempotency_key(event: dict[str, Any]) -> str:
+def _fingerprint(event: dict[str, Any]) -> str:
     semantic = "\x1f".join(
-        event[field].strip() for field in ("id", "received_at", "source", "subject", "body")
+        event[field].strip()
+        for field in (
+            "received_at",
+            "source",
+            "source_version",
+            "subject",
+            "body",
+            "reporter",
+        )
     )
-    return "triage:" + hashlib.sha256(semantic.encode()).hexdigest()
+    return hashlib.sha256(semantic.encode()).hexdigest()
 
 
-def _route(event: dict[str, Any]) -> tuple[str, tuple[str, ...], float]:
-    # Source content is treated only as data. It cannot add tools, permissions, or rules.
-    text = f"{event['subject']} {event['body']}".casefold()
-    scored: list[tuple[int, int, str, tuple[str, ...]]] = []
+def _idempotency_key(event_id: str) -> str:
+    return "triage:" + hashlib.sha256(event_id.encode()).hexdigest()
+
+
+def _span(event: dict[str, Any], field: str, term: str) -> EvidenceSpan:
+    text = event[field]
+    match = re.search(rf"\b{re.escape(term)}\b", text, flags=re.IGNORECASE)
+    if match is None:
+        raise PolicyError("internal grounding span mismatch")
+    return EvidenceSpan(
+        source=event["source"],
+        source_version=event["source_version"],
+        field=field,
+        start=match.start(),
+        end=match.end(),
+        text_sha256=hashlib.sha256(match.group(0).encode()).hexdigest(),
+    )
+
+
+def _route(
+    event: dict[str, Any],
+) -> tuple[str, tuple[str, ...], float, tuple[EvidenceSpan, ...], bool]:
+    scored: list[tuple[int, int, str, tuple[tuple[str, str], ...]]] = []
     for priority, (route, words) in enumerate(ROUTES):
-        hits = tuple(word for word in words if re.search(rf"\b{re.escape(word)}\b", text))
-        scored.append((len(hits), -priority, route, hits))
+        hits: list[tuple[str, str]] = []
+        for word in words:
+            for field_name in ("subject", "body"):
+                if re.search(rf"\b{re.escape(word)}\b", event[field_name], re.IGNORECASE):
+                    hits.append((word, field_name))
+                    break
+        scored.append((len(hits), -priority, route, tuple(hits)))
     count, _, route, hits = max(scored)
+    tied_routes = [item for item in scored if item[0] == count and count > 0]
     if count == 0:
-        return "general-review", ("no_known_route_match",), 0.35
+        return "general-review", ("abstain:no_supported_route",), 0.0, (), True
+    if len(tied_routes) > 1:
+        return "general-review", ("abstain:conflicting_route_evidence",), 0.0, (), True
+    spans = tuple(_span(event, field_name, word) for word, field_name in hits)
     confidence = min(0.55 + 0.12 * count, 0.91)
-    return route, tuple(f"matched:{word}" for word in hits), confidence
+    return route, tuple(f"matched:{word}" for word, _ in hits), confidence, spans, False
 
 
 def triage_one(
     event: dict[str, Any],
     *,
-    granted_scopes: set[str],
-    ledger: InMemoryLedger,
-    kill_switch: bool = False,
+    context: RequestContext,
+    authorization_policy: AuthorizationPolicy,
+    ledger: DurableLedger,
+    telemetry: TelemetrySink,
+    kill_switch: KillSwitch,
+    disposition_owner: str = "Anushrut Gupta",
+    evaluation_time: datetime = DEFAULT_EVALUATION_TIME,
+    max_runtime_seconds: float = MAX_RUNTIME_SECONDS,
+    step_hook: Callable[[str], None] | None = None,
 ) -> TriageResult:
-    if kill_switch:
-        raise CancelledError("kill switch is active")
-    if REQUIRED_SCOPE not in granted_scopes:
-        raise AuthorizationError(f"missing required scope: {REQUIRED_SCOPE}")
-    if granted_scopes - {REQUIRED_SCOPE}:
-        raise AuthorizationError("unexpected broader scope; fail closed")
-    _validate_event(event)
+    run_id = str(uuid4())
+    correlation_id = str(uuid4())
+    event_id = str(event.get("id", "unknown"))
+    deadline = time.monotonic() + max_runtime_seconds
+    trace: _RunTrace | None = None
+    claimed = False
+    recovered = False
 
-    key = _idempotency_key(event)
-    prior = ledger.get(key)
-    if prior is not None:
-        return TriageResult(**{**asdict(prior), "duplicate": True})
+    def checkpoint(stage: str) -> None:
+        if step_hook is not None:
+            step_hook(stage)
+        if time.monotonic() > deadline:
+            raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
+        kill_switch.check(run_id=run_id)
 
-    route, reasons, confidence = _route(event)
-    text = f"{event['subject']} {event['body']}".casefold()
-    sensitive = any(term in text for term in SENSITIVE_TERMS)
-    if sensitive:
-        route = "security"
-        reasons = tuple(dict.fromkeys((*reasons, "sensitive_case_escalation")))
-        confidence = max(confidence, 0.8)
+    try:
+        if max_runtime_seconds <= 0:
+            raise DeadlineExceededError("maximum runtime exceeded", run_id=run_id)
+        trace = _RunTrace(
+            telemetry=telemetry,
+            run_id=run_id,
+            correlation_id=correlation_id,
+            event_id=event_id,
+            context=context,
+        )
+        checkpoint("received")
+        metadata = _metadata(event)
+        authorization_policy.authorize(context, metadata)
+        trace.emit("policy_decision", "authorized")
+        checkpoint("authorized")
 
-    result = TriageResult(
-        event_id=event["id"],
-        status="draft",
-        suggested_route=route,
-        reason_codes=reasons,
-        citations=("event.subject", "event.body"),
-        confidence=round(confidence, 2),
-        requires_human_disposition=True,
-        sensitive_case=sensitive,
-        duplicate=False,
-        idempotency_key=key,
-    )
-    ledger.record(key, result)
-    return result
+        _validate_event(event, evaluation_time=evaluation_time)
+        trace.transition("validated")
+        checkpoint("validated")
+
+        fingerprint = _fingerprint(event)
+        mode, prior, recovered = ledger.claim(
+            event_id=event["id"], fingerprint=fingerprint, run_id=run_id, deadline=deadline
+        )
+        if mode == "duplicate":
+            assert prior is not None
+            trace.transition("planned", "exact_replay")
+            trace.transition("executing", "duplicate_suppressed")
+            trace.transition("succeeded", "original_outcome_reused")
+            return replace(prior, duplicate=True, run_id=run_id)
+        claimed = True
+        if recovered:
+            trace.emit("retry", "recovering_prior_failure")
+
+        trace.transition("planned")
+        checkpoint("planned")
+        trace.transition("executing")
+        checkpoint("executing")
+
+        route, reasons, confidence, spans, abstained = _route(event)
+        sensitive_hits: list[EvidenceSpan] = []
+        for term in SENSITIVE_TERMS:
+            for field_name in ("subject", "body"):
+                if re.search(rf"\b{re.escape(term)}\b", event[field_name], re.IGNORECASE):
+                    sensitive_hits.append(_span(event, field_name, term))
+                    break
+        sensitive = bool(sensitive_hits)
+        if sensitive:
+            route = "security"
+            reasons = tuple(dict.fromkeys((*reasons, "sensitive_case_escalation")))
+            confidence = max(confidence, 0.8)
+            spans = tuple(dict.fromkeys((*spans, *sensitive_hits)))
+            abstained = False
+
+        checkpoint("classified")
+        facts = tuple(
+            {
+                "fact_id": f"fact-{index + 1}",
+                "kind": "policy_keyword_match",
+                "status": "extracted",
+                "evidence_index": index,
+            }
+            for index, _ in enumerate(spans)
+        )
+        inference = {
+            "kind": "route_suggestion",
+            "status": "supported" if spans else "unsupported_abstention",
+            "basis_fact_ids": [fact["fact_id"] for fact in facts],
+            "human_must_decide": True,
+        }
+        resolutions = {
+            "billing": "Have the named human review the referenced billing evidence.",
+            "security": "Have the named human perform the sensitive-case security review.",
+            "technical-support": "Have the named human review the referenced technical evidence.",
+        }
+        result = TriageResult(
+            event_id=event["id"],
+            source_version=event["source_version"],
+            status="draft",
+            suggested_route=route,
+            suggested_resolution=resolutions.get(route),
+            reason_codes=reasons,
+            evidence=spans,
+            extracted_facts=facts,
+            inference=inference,
+            confidence=round(confidence, 2),
+            requires_human_disposition=True,
+            disposition_owner=disposition_owner,
+            sensitive_case=sensitive,
+            abstained=abstained,
+            duplicate=False,
+            idempotency_key=_idempotency_key(event["id"]),
+            run_id=run_id,
+            terminal_state="reconciled" if recovered else "succeeded",
+        )
+        trace.emit("tool_inventory", "none")
+        trace.emit("side_effect_inventory", "none")
+        ledger.complete(event["id"], result)
+        trace.transition("succeeded")
+        if recovered:
+            ledger.reconcile(event["id"])
+            trace.transition("reconciled", "recovery_verified")
+        return result
+    except TriageError as exc:
+        if exc.run_id is None:
+            exc.run_id = run_id
+        if trace is not None:
+            terminal = "cancelled" if isinstance(exc, CancelledError) else "failed"
+            if trace.state not in {"succeeded", "failed", "cancelled", "reconciled"}:
+                try:
+                    trace.transition(terminal, exc.code)
+                except TelemetryUnavailableError:
+                    pass
+            if claimed:
+                ledger.abort(event_id, terminal)
+        raise
+    except Exception as exc:
+        if trace is not None and trace.state not in {"failed", "cancelled", "reconciled"}:
+            try:
+                trace.transition("failed", "runtime_error")
+            except TelemetryUnavailableError:
+                pass
+        if claimed:
+            ledger.abort(event_id, "failed")
+        raise PolicyError("runtime step failed safely", run_id=run_id) from exc
 
 
 def triage_batch(
     events: list[dict[str, Any]],
     *,
-    granted_scopes: set[str],
-    ledger: InMemoryLedger | None = None,
-    kill_switch: bool = False,
+    context: RequestContext,
+    authorization_policy: AuthorizationPolicy,
+    ledger: DurableLedger | None = None,
+    telemetry: TelemetrySink | None = None,
+    kill_switch: KillSwitch | None = None,
+    evaluation_time: datetime = DEFAULT_EVALUATION_TIME,
+    max_runtime_seconds: float = MAX_RUNTIME_SECONDS,
 ) -> list[dict[str, Any]]:
     if len(events) > MAX_ITEMS_PER_RUN:
         raise PolicyError(f"batch exceeds {MAX_ITEMS_PER_RUN} items")
-    active_ledger = ledger or InMemoryLedger()
+    active_ledger = ledger or DurableLedger()
+    active_telemetry = telemetry or TelemetrySink()
+    active_switch = kill_switch or KillSwitch(owner_id="Anushrut Gupta")
+    ordered = sorted(events, key=lambda item: (_parse_timestamp(item["received_at"]), item["id"]))
     return [
         triage_one(
             event,
-            granted_scopes=granted_scopes,
+            context=context,
+            authorization_policy=authorization_policy,
             ledger=active_ledger,
-            kill_switch=kill_switch,
+            telemetry=active_telemetry,
+            kill_switch=active_switch,
+            evaluation_time=evaluation_time,
+            max_runtime_seconds=max_runtime_seconds,
         ).to_dict()
-        for event in events
+        for event in ordered
     ]

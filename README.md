@@ -1,59 +1,72 @@
 # How to Bot
 
-**Status: v0.1 draft foundation**
+**Status: Gate 2 draft — not approved for merge, release, or publication**
 
 How to Bot is an open operating manual for persistent workplace bots. It publishes
-verified operational playbooks—not prompt snippets. Every tutorial defines the job,
+testable operational contracts—not prompt snippets. Every tutorial defines the job,
 actors, permissions, state, approval boundaries, tests, observability, failure
 behavior, recovery, stop path, evidence, and maintenance status.
 
-## What is in v0.1
+## Gate 2 contents
 
-- A machine-readable tutorial contract and JSON Schemas.
-- A risk-tier and evidence model.
-- Automated manifest, link, and secret checks.
-- A synthetic **inbound triage** pilot demonstrating bounded classification,
-  suggested routing, citations, escalation, replay protection, and permission checks.
-- A CI workflow that runs the complete local validation suite.
+- A strict machine-readable tutorial contract and five JSON Schemas.
+- A risk-tier model and the frozen evidence-label taxonomy.
+- Cross-file manifest, link, secret, lint, and test checks.
+- A synthetic **inbound triage** pilot demonstrating current-policy authorization,
+  deterministic draft routing/abstention, exact evidence spans, named human disposition,
+  durable atomic replay handling, redacted histories, deadlines, and an independently
+  activatable stop control.
+- A predeclared versioned evaluation set with raw numerators and denominators.
+- A row-by-row remediation ledger for the independent review failures.
 
-## Quick start
+## Exact tested environment
 
-Prerequisites: Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+- CPython 3.14.4
+- uv 0.12.8
+- local-python adapter 0.2.0
+- Exact dependency versions are locked in `uv.lock` and repeated in the tutorial manifest.
+
+Prerequisites: install [uv](https://docs.astral.sh/uv/) 0.12.8. `uv sync --frozen`
+uses `.python-version` to obtain the tested Python version when needed.
+
+## Complete local gate
 
 ```bash
 uv sync --frozen
 uv run python tools/validate.py
 uv run python tools/check_links.py
 uv run python tools/secret_scan.py
-uv run pytest
-uv run python tutorials/inbound-triage/run.py   tutorials/inbound-triage/fixtures/events.json
+uv run ruff check .
+uv run pytest -vv
+uv run python tutorials/inbound-triage/evaluate.py
+uv run python tutorials/inbound-triage/run.py tutorials/inbound-triage/fixtures/events.json
 ```
 
-The pilot uses only synthetic data and performs no network calls or durable external
-writes.
+The pilot uses only synthetic data and performs no network call, external write, send,
+assignment, closure, alert, publication, or final disposition. Its SQLite ledger is
+durable across local adapter instances but is not a distributed ledger.
 
 ## Repository map
 
-- `TUTORIAL_STANDARD.md` — normative v0.1 authoring and publication contract.
-- `EVIDENCE_POLICY.md` — claim labels and evidence thresholds.
-- `schemas/` — machine-readable tutorial, permission, approval, and claim schemas.
+- `TUTORIAL_STANDARD.md` — normative authoring and publication contract.
+- `EVIDENCE_POLICY.md` — frozen claim labels and evidence rules.
+- `schemas/` — tutorial, permission, approval, claim, and evaluation schemas.
 - `tools/` — repository validation.
-- `tutorials/inbound-triage/` — the first runnable pilot.
+- `tutorials/inbound-triage/` — the only runnable pilot.
+- `tutorials/inbound-triage/remediation.yaml` — traceability for the 20 failed review rows.
 - `patterns/` — reusable operational patterns.
 - `platforms/` — adapter contract guidance.
 
-## Safety posture
+## Safety and evidence posture
 
-The highest material risk dimension determines a tutorial's tier. A model never
-approves its own action. Authorization is enforced by trusted code. Changed targets,
-payloads, permissions, or cost invalidate prior approval. T4 workflows are not
-publishable as ordinary runnable tutorials.
+The highest material risk dimension determines a tutorial's tier. A model or source
+message never grants authorization or approves its own action. Current authorization is
+enforced by trusted code before content use. Material changes force `needs_retest`.
+T4 workflows are not publishable as ordinary runnable tutorials.
 
 See [SECURITY.md](SECURITY.md), [TUTORIAL_STANDARD.md](TUTORIAL_STANDARD.md), and
 the pilot [threat model](tutorials/inbound-triage/THREAT_MODEL.md).
 
-## Project state
-
-This repository foundation is a draft. Passing automated tests establishes only the
-claims listed as `VERIFIED`; it does not make the pilot production-ready. Publication
-requires the review gates in `TUTORIAL_STANDARD.md`.
+Passing author-side tests establishes only the narrowly scoped `demonstrated` claims in
+`claims.yaml`. It does not establish independent reproduction, production readiness,
+safety, reliability, portability, merge approval, or publication approval.

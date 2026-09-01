@@ -1,21 +1,33 @@
 # Evidence policy
 
-Each material claim has a stable ID, exact text, scope, date, limitations, and one label:
+Every material claim has a stable ID, exact text, source, date, scope, procedure,
+limitations, working evidence references, and exactly one frozen label:
 
-- **SOURCE** — supported by an authoritative source or specification.
-- **VERIFIED** — demonstrated by a repeatable test for the exact version.
-- **OBSERVED** — privacy-safe, dated operational observation with provenance.
-- **HYPOTHESIS** — unverified; never presented as fact.
+- **vendor_claim** — stated by a vendor; not independently confirmed.
+- **documented** — supported by an authoritative specification or repository contract.
+- **anecdotal** — a dated observation without a representative denominator.
+- **demonstrated** — reproduced by a repeatable test for the exact stated version.
+- **recurring** — repeatedly observed under a declared cadence and operating envelope.
+- **measured** — supported by a representative denominator, method, and uncertainty.
 
-Evidence ladder:
+No alternative label may appear in a claim manifest. In particular, the earlier
+SOURCE/VERIFIED/OBSERVED/HYPOTHESIS vocabulary is retired.
 
-- **E0 Assertion:** no evidence; insufficient for publication.
-- **E1 Source-backed:** authoritative source supports the principle.
-- **E2 Demonstrated:** repeatable test and raw result for this version.
-- **E3 Independently reproduced:** non-author clean-environment reproduction.
-- **E4 Operational:** privacy-safe longitudinal or production-like evidence with a denominator.
+Evidence strength still matters inside each label:
 
-Minimums: descriptive source claims require E1; adapter compatibility requires E2;
-T2+ adapter compatibility requires E3; reliability/safety/portability claims require
-E3 plus failure evidence. “Production-ready” additionally requires E4 and an explicit
-operating envelope. Automated checks do not prove absence of unknown risk.
+1. Assertion alone is insufficient.
+2. Source-backed documentation supports principles, not runtime success.
+3. Exact-version demonstration requires repeatable tests and raw results.
+4. Independent reproduction must be performed by a non-author in a clean environment.
+5. Operational measurement requires privacy-safe, representative longitudinal evidence.
+
+Minimums: adapter compatibility requires `demonstrated`; T2+ compatibility additionally
+requires independent reproduction. Reliability, safety, portability, and
+production-ready claims require independent failure evidence plus an explicit operating
+envelope; production claims additionally require representative operational measurement.
+Automated checks never prove absence of unknown risk.
+
+Claim wording must not exceed its evidence. A vendor source cannot prove a tutorial ran;
+a synthetic demonstration cannot establish production accuracy; aggregate performance
+cannot offset a failed critical privacy, authorization, approval, side-effect, recovery,
+or stop invariant.

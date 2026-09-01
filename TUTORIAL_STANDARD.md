@@ -28,7 +28,9 @@ Every tutorial MUST define:
     thresholds, zero-failure invariants, trial counts, raters, baseline, regression triggers.
 11. **Reproduction:** clean setup, locked dependencies, no-secret config, synthetic
     fixtures, commands, expected outputs, teardown, troubleshooting, cost/time envelope.
-12. **Evidence:** claim ID/text/label/scope/evidence/date/procedure/limitations.
+12. **Evidence:** claim ID/text/source/label/scope/evidence/date/procedure/limitations.
+    Allowed labels are exactly `vendor_claim`, `documented`, `anecdotal`,
+    `demonstrated`, `recurring`, or `measured`.
 13. **Adapters:** concrete identity, permissions, tools, approval enforcement, retries,
     telemetry, kill switch, teardown, and unsupported guarantees.
 

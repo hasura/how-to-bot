@@ -5,7 +5,8 @@
     "source": "synthetic-form",
     "subject": "Invoice charge question",
     "body": "Please review the duplicate charge on this synthetic invoice.",
-    "reporter": "synthetic-user-1"
+    "reporter": "synthetic-user-operator",
+    "source_version": "fixture-v2"
   },
   {
     "id": "evt-002",
@@ -13,7 +14,8 @@
     "source": "synthetic-email",
     "subject": "Possible credential phishing",
     "body": "A synthetic test account received a suspicious sign-in request.",
-    "reporter": "synthetic-user-2"
+    "reporter": "synthetic-user-operator",
+    "source_version": "fixture-v2"
   },
   {
     "id": "evt-003",
@@ -21,6 +23,7 @@
     "source": "synthetic-form",
     "subject": "Product error",
     "body": "The example export failed with an error.",
-    "reporter": "synthetic-user-3"
+    "reporter": "synthetic-user-operator",
+    "source_version": "fixture-v2"
   }
 ]

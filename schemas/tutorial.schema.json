@@ -9,11 +9,18 @@
     "title",
     "version",
     "status",
+    "license",
+    "changelog",
+    "adapters",
+    "tested_versions",
     "risk",
     "lifecycle",
     "outcome",
     "actors",
+    "data_flow",
     "workflow",
+    "state_governance",
+    "observability",
     "evaluation",
     "files"
   ],
@@ -33,6 +40,7 @@
     "status": {
       "enum": [
         "draft",
+        "needs_retest",
         "reviewed",
         "published",
         "deprecated",
@@ -40,28 +48,58 @@
       ]
     },
     "license": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
+    },
+    "changelog": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapters": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tested_versions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "risk": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "tier",
-        "rationale"
-      ],
+      "required": ["tier", "rationale", "data_class", "audience", "capabilities", "side_effects"],
       "properties": {
         "tier": {
-          "enum": [
-            "T0",
-            "T1",
-            "T2",
-            "T3",
-            "T4"
-          ]
+          "enum": ["T0", "T1", "T2", "T3", "T4"]
         },
         "rationale": {
           "type": "string",
           "minLength": 10
+        },
+        "data_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"}
+        },
+        "side_effects": {
+          "type": "array",
+          "items": {"type": "string"}
         }
       }
     },
@@ -71,211 +109,240 @@
       "required": [
         "maintainer",
         "domain_owner",
+        "reliability_reviewer",
+        "security_exception_owner",
         "created",
         "last_verified",
-        "next_review"
+        "next_review",
+        "issue_path",
+        "security_report_path",
+        "retest_required",
+        "retest_reason",
+        "material_change_triggers",
+        "retire_migrate_procedure"
       ],
       "properties": {
-        "maintainer": {
-          "type": "string"
+        "maintainer": {"type": "string", "minLength": 3},
+        "domain_owner": {"type": "string", "minLength": 3},
+        "reliability_reviewer": {"type": "string", "minLength": 3},
+        "security_exception_owner": {"type": "string", "minLength": 3},
+        "created": {"type": "string", "format": "date"},
+        "last_verified": {"type": "string", "format": "date"},
+        "next_review": {"type": "string", "format": "date"},
+        "issue_path": {"type": "string", "format": "uri"},
+        "security_report_path": {"type": "string", "format": "uri"},
+        "retest_required": {"type": "boolean"},
+        "retest_reason": {"type": ["string", "null"]},
+        "material_change_triggers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["permission", "policy", "runtime", "dependency", "model", "adapter", "incident"]
+          }
         },
-        "domain_owner": {
-          "type": "string"
-        },
-        "security_reviewer": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "created": {
-          "type": "string",
-          "format": "date"
-        },
-        "last_verified": {
-          "type": "string",
-          "format": "date"
-        },
-        "next_review": {
-          "type": "string",
-          "format": "date"
-        }
+        "retire_migrate_procedure": {"type": "string", "minLength": 10}
       }
     },
     "outcome": {
       "type": "object",
+      "additionalProperties": false,
       "required": [
         "job",
         "users",
         "non_goals",
+        "preconditions",
         "inputs",
         "outputs",
         "side_effects",
         "success_criteria",
-        "unacceptable_outcomes"
+        "unacceptable_outcomes",
+        "assumptions",
+        "affected_parties",
+        "limitations"
       ],
       "properties": {
-        "job": {
-          "type": "string"
-        },
-        "users": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          }
-        },
-        "non_goals": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "inputs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "outputs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
+        "job": {"type": "string", "minLength": 1},
+        "users": {"$ref": "#/$defs/nonEmptyStrings"},
+        "non_goals": {"$ref": "#/$defs/nonEmptyStrings"},
+        "preconditions": {"$ref": "#/$defs/nonEmptyStrings"},
+        "inputs": {"$ref": "#/$defs/nonEmptyStrings"},
+        "outputs": {"$ref": "#/$defs/nonEmptyStrings"},
         "side_effects": {
           "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "items": {"type": "string"}
         },
-        "success_criteria": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          }
-        },
-        "unacceptable_outcomes": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          }
-        }
+        "success_criteria": {"$ref": "#/$defs/nonEmptyStrings"},
+        "unacceptable_outcomes": {"$ref": "#/$defs/nonEmptyStrings"},
+        "assumptions": {"$ref": "#/$defs/nonEmptyStrings"},
+        "affected_parties": {"$ref": "#/$defs/nonEmptyStrings"},
+        "limitations": {"$ref": "#/$defs/nonEmptyStrings"}
       }
     },
     "actors": {
       "type": "array",
-      "minItems": 2,
+      "minItems": 5,
       "items": {
         "type": "object",
-        "required": [
-          "name",
-          "responsibility"
-        ],
+        "additionalProperties": false,
+        "required": ["id", "kind", "identity", "responsibility", "trust"],
         "properties": {
-          "name": {
-            "type": "string"
+          "id": {"type": "string", "minLength": 1},
+          "kind": {
+            "enum": ["requester", "operator", "approver", "data_owner", "affected_party", "tool", "destination"]
           },
-          "responsibility": {
-            "type": "string"
-          }
+          "identity": {"type": "string", "minLength": 1},
+          "responsibility": {"type": "string", "minLength": 1},
+          "trust": {"enum": ["trusted", "untrusted", "not_applicable"]}
         }
+      }
+    },
+    "data_flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assets", "classifications", "untrusted_inputs", "tools", "destination", "boundaries"],
+      "properties": {
+        "assets": {"$ref": "#/$defs/nonEmptyStrings"},
+        "classifications": {"$ref": "#/$defs/nonEmptyStrings"},
+        "untrusted_inputs": {"$ref": "#/$defs/nonEmptyStrings"},
+        "tools": {"$ref": "#/$defs/nonEmptyStrings"},
+        "destination": {"type": "string", "minLength": 1},
+        "boundaries": {"$ref": "#/$defs/nonEmptyStrings"}
       }
     },
     "workflow": {
       "type": "object",
-      "required": [
-        "trigger",
-        "termination",
-        "states",
-        "invariants"
-      ],
+      "additionalProperties": false,
+      "required": ["trigger", "termination", "states", "invariants", "steps"],
       "properties": {
-        "trigger": {
-          "type": "string"
-        },
-        "termination": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
+        "trigger": {"type": "string", "minLength": 1},
+        "termination": {"$ref": "#/$defs/nonEmptyStrings"},
         "states": {
           "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
           "items": {
-            "type": "string"
+            "enum": [
+              "received",
+              "validated",
+              "planned",
+              "awaiting_approval",
+              "executing",
+              "succeeded",
+              "partially_succeeded",
+              "failed",
+              "cancelled",
+              "reconciled"
+            ]
           }
         },
-        "invariants": {
+        "invariants": {"$ref": "#/$defs/nonEmptyStrings"},
+        "steps": {
           "type": "array",
           "minItems": 1,
-          "items": {
-            "type": "string"
-          }
+          "items": {"$ref": "#/$defs/step"}
         }
+      }
+    },
+    "state_governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "owner", "retention_days", "access", "deletion", "reset", "ordering", "concurrency"],
+      "properties": {
+        "location": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 3},
+        "retention_days": {"type": "integer", "minimum": 1},
+        "access": {"$ref": "#/$defs/nonEmptyStrings"},
+        "deletion": {"type": "string", "minLength": 1},
+        "reset": {"type": "string", "minLength": 1},
+        "ordering": {"type": "string", "minLength": 1},
+        "concurrency": {"type": "string", "minLength": 1}
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["events", "identities", "redaction", "retention_days", "access", "loss_behavior"],
+      "properties": {
+        "events": {"$ref": "#/$defs/nonEmptyStrings"},
+        "identities": {"$ref": "#/$defs/nonEmptyStrings"},
+        "redaction": {"$ref": "#/$defs/nonEmptyStrings"},
+        "retention_days": {"type": "integer", "minimum": 1},
+        "access": {"$ref": "#/$defs/nonEmptyStrings"},
+        "loss_behavior": {"type": "string", "minLength": 1}
       }
     },
     "evaluation": {
       "type": "object",
-      "required": [
-        "fixtures",
-        "commands",
-        "critical_invariants"
-      ],
+      "additionalProperties": false,
+      "required": ["fixture_version", "fixtures", "thresholds", "commands", "critical_invariants"],
       "properties": {
-        "fixtures": {
-          "type": "string"
-        },
-        "commands": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          }
-        },
-        "critical_invariants": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "string"
-          }
-        }
+        "fixture_version": {"type": "string", "minLength": 1},
+        "fixtures": {"type": "string", "minLength": 1},
+        "thresholds": {"type": "string", "minLength": 1},
+        "commands": {"$ref": "#/$defs/nonEmptyStrings"},
+        "critical_invariants": {"$ref": "#/$defs/nonEmptyStrings"}
       }
     },
     "files": {
       "type": "object",
+      "additionalProperties": false,
       "required": [
         "spec",
         "threat_model",
         "runbook",
         "permissions",
         "approvals",
-        "claims"
+        "claims",
+        "evaluation",
+        "adapter",
+        "changelog",
+        "failure_matrix"
       ],
       "properties": {
-        "spec": {
-          "type": "string"
-        },
-        "threat_model": {
-          "type": "string"
-        },
-        "runbook": {
-          "type": "string"
-        },
-        "permissions": {
-          "type": "string"
-        },
-        "approvals": {
-          "type": "string"
-        },
-        "claims": {
-          "type": "string"
-        },
-        "adapter": {
-          "type": "string"
-        }
+        "spec": {"type": "string"},
+        "threat_model": {"type": "string"},
+        "runbook": {"type": "string"},
+        "permissions": {"type": "string"},
+        "approvals": {"type": "string"},
+        "claims": {"type": "string"},
+        "evaluation": {"type": "string"},
+        "adapter": {"type": "string"},
+        "changelog": {"type": "string"},
+        "failure_matrix": {"type": "string"}
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyStrings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "input_schema",
+        "output_schema",
+        "preconditions",
+        "postconditions",
+        "invariants",
+        "timeout_seconds",
+        "error_classes",
+        "exit_conditions"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "input_schema": {"type": "string", "minLength": 1},
+        "output_schema": {"type": "string", "minLength": 1},
+        "preconditions": {"$ref": "#/$defs/nonEmptyStrings"},
+        "postconditions": {"$ref": "#/$defs/nonEmptyStrings"},
+        "invariants": {"$ref": "#/$defs/nonEmptyStrings"},
+        "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "error_classes": {"$ref": "#/$defs/nonEmptyStrings"},
+        "exit_conditions": {"$ref": "#/$defs/nonEmptyStrings"}
       }
     }
   }

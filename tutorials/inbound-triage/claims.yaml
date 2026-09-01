@@ -1,26 +1,38 @@
 tutorial_id: inbound-triage
 claims:
   - id: HTB-1
-    text: The v0.1 local pilot produces route suggestions without network calls or durable external writes.
-    label: VERIFIED
-    level: E2
-    scope: inbound-triage 0.1.0 local-python adapter with synthetic fixtures
-    evidence: [tests/test_repository.py, tutorials/inbound-triage/test_conformance.py]
-    date: "2026-08-31"
-    limitations: This does not demonstrate a live source-system adapter.
+    text: The 0.2.0 local-python adapter produces private draft route suggestions without network calls, external destinations, or durable external writes.
+    label: demonstrated
+    source: local-python adapter 0.2.0 source and tests
+    scope: inbound-triage 0.2.0 with synthetic fixture set inbound-triage-eval-v2
+    evidence: [tests/test_repository.py, tutorials/inbound-triage/test_conformance.py, tutorials/inbound-triage/evaluate.py]
+    date: "2026-09-01"
+    procedure: Run the frozen validation, static no-side-effect checks, pytest suite, and evaluation command.
+    limitations: This demonstrates only the local adapter and does not establish live ingestion or production safety.
   - id: HTB-2
-    text: Exact replay in one runner process is marked as a duplicate and returns the original semantic outcome.
-    label: VERIFIED
-    level: E2
-    scope: inbound-triage 0.1.0 in-memory example ledger
-    evidence: [tutorials/inbound-triage/test_failure_injection.py::test_duplicate_replay]
-    date: "2026-08-31"
-    limitations: A real adapter requires a durable concurrency-safe ledger.
+    text: Within one Python process, serial and concurrent exact replay reuse one semantic result, changed-content replay conflicts, and failed work can be retried below a repeated-error stop.
+    label: demonstrated
+    source: concurrency-safe InMemoryLedger implementation and adversarial tests
+    scope: inbound-triage 0.2.0 process-local ledger
+    evidence: [tutorials/inbound-triage/test_failure_injection.py::test_concurrent_exact_replay_is_atomic, tutorials/inbound-triage/test_failure_injection.py::test_same_event_identity_changed_content_is_conflict, tutorials/inbound-triage/test_failure_injection.py::test_failed_retry_recovery_and_repeated_error_stop_are_reconstructable]
+    date: "2026-09-01"
+    procedure: Run the named serial, concurrent, conflict, interruption/recovery, and repeated-error tests.
+    limitations: The ledger is not durable across processes or restarts and makes no distributed-idempotency claim.
   - id: HTB-3
-    text: Sensitive synthetic cases are escalated to the security route and remain human-owned.
-    label: VERIFIED
-    level: E2
-    scope: inbound-triage 0.1.0 synthetic fixtures
-    evidence: [tutorials/inbound-triage/test_conformance.py::test_sensitive_case_escalates]
-    date: "2026-08-31"
-    limitations: Keyword policy is illustrative and not a production classifier.
+    text: The frozen synthetic evaluation requires perfect routing, abstention, grounding, and exception detection, with zero critical-invariant failures.
+    label: documented
+    source: predeclared evaluation contract
+    scope: inbound-triage-eval-v2 thresholds frozen before remediation evaluation
+    evidence: [tutorials/inbound-triage/evaluation.yaml, tutorials/inbound-triage/fixtures/evaluation.json]
+    date: "2026-09-01"
+    procedure: Inspect the frozen timestamp, then run evaluate.py and compare raw numerator/denominator to every threshold.
+    limitations: Passing a small synthetic set is not a production accuracy, reliability, safety, or portability claim.
+  - id: HTB-4
+    text: Sensitive synthetic cases transfer visibly to security while final disposition remains assigned to Anushrut Gupta and cannot be performed by this adapter.
+    label: demonstrated
+    source: local-python adapter 0.2.0 conformance and capability tests
+    scope: inbound-triage 0.2.0 synthetic fixtures
+    evidence: [tutorials/inbound-triage/test_conformance.py::test_sensitive_case_escalates_to_named_human, tests/test_repository.py::test_pilot_has_no_side_effects_and_is_draft]
+    date: "2026-09-01"
+    procedure: Run the named tests and inspect the result owner, draft flag, escalation code, and absent effect capabilities.
+    limitations: Keyword escalation is illustrative and can miss semantic nuance.

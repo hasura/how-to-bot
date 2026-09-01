@@ -1,0 +1,98 @@
+[
+  {
+    "case_id": "ordinary-billing",
+    "event": {
+      "id": "eval-001",
+      "received_at": "2026-09-01T19:00:00Z",
+      "source": "synthetic-form",
+      "source_version": "fixture-v2",
+      "subject": "Invoice charge question",
+      "body": "Please review the duplicate charge on this synthetic invoice.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_route": "billing",
+    "expected_abstained": false
+  },
+  {
+    "case_id": "sensitive-security",
+    "event": {
+      "id": "eval-002",
+      "received_at": "2026-09-01T19:01:00Z",
+      "source": "synthetic-email",
+      "source_version": "fixture-v2",
+      "subject": "Possible credential phishing",
+      "body": "A synthetic test account received a suspicious sign-in request.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_route": "security",
+    "expected_abstained": false
+  },
+  {
+    "case_id": "ordinary-technical",
+    "event": {
+      "id": "eval-003",
+      "received_at": "2026-09-01T19:02:00Z",
+      "source": "synthetic-form",
+      "source_version": "fixture-v2",
+      "subject": "Product error",
+      "body": "The example export failed with an error.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_route": "technical-support",
+    "expected_abstained": false
+  },
+  {
+    "case_id": "unsupported-abstention",
+    "event": {
+      "id": "eval-004",
+      "received_at": "2026-09-01T19:03:00Z",
+      "source": "synthetic-form",
+      "source_version": "fixture-v2",
+      "subject": "General hello",
+      "body": "This synthetic note has no supported routing signal.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_route": "general-review",
+    "expected_abstained": true
+  },
+  {
+    "case_id": "contradictory-abstention",
+    "event": {
+      "id": "eval-005",
+      "received_at": "2026-09-01T19:04:00Z",
+      "source": "synthetic-form",
+      "source_version": "fixture-v2",
+      "subject": "Invoice question",
+      "body": "The synthetic export has an outage.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_route": "general-review",
+    "expected_abstained": true
+  },
+  {
+    "case_id": "stale-exception",
+    "event": {
+      "id": "eval-006",
+      "received_at": "2001-01-01T00:00:00Z",
+      "source": "synthetic-form",
+      "source_version": "fixture-v2",
+      "subject": "Invoice question",
+      "body": "A stale synthetic charge.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_error": "policy"
+  },
+  {
+    "case_id": "malformed-time-exception",
+    "event": {
+      "id": "eval-007",
+      "received_at": "not-a-time",
+      "source": "synthetic-form",
+      "source_version": "fixture-v2",
+      "subject": "Invoice question",
+      "body": "A malformed synthetic charge.",
+      "reporter": "synthetic-user-operator"
+    },
+    "expected_error": "validation"
+  }
+]

@@ -1,17 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://howtobot.ai/schemas/claims.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "tutorial_id",
-    "claims"
-  ],
+  "required": ["tutorial_id", "claims"],
   "properties": {
-    "tutorial_id": {
-      "type": "string"
-    },
+    "tutorial_id": {"type": "string"},
     "claims": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -19,54 +16,29 @@
           "id",
           "text",
           "label",
-          "level",
+          "source",
           "scope",
           "evidence",
           "date",
+          "procedure",
           "limitations"
         ],
         "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[A-Z]+-[0-9]+$"
-          },
-          "text": {
-            "type": "string"
-          },
+          "id": {"type": "string", "pattern": "^[A-Z]+-[0-9]+$"},
+          "text": {"type": "string", "minLength": 1},
           "label": {
-            "enum": [
-              "SOURCE",
-              "VERIFIED",
-              "OBSERVED",
-              "HYPOTHESIS"
-            ]
+            "enum": ["vendor_claim", "documented", "anecdotal", "demonstrated", "recurring", "measured"]
           },
-          "level": {
-            "enum": [
-              "E0",
-              "E1",
-              "E2",
-              "E3",
-              "E4"
-            ]
-          },
-          "scope": {
-            "type": "string"
-          },
+          "source": {"type": "string", "minLength": 1},
+          "scope": {"type": "string", "minLength": 1},
           "evidence": {
             "type": "array",
             "minItems": 1,
-            "items": {
-              "type": "string"
-            }
+            "items": {"type": "string", "minLength": 1}
           },
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "limitations": {
-            "type": "string"
-          }
+          "date": {"type": "string", "format": "date"},
+          "procedure": {"type": "string", "minLength": 1},
+          "limitations": {"type": "string", "minLength": 1}
         }
       }
     }

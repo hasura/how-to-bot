@@ -1,18 +1,22 @@
 tutorial_id: inbound-triage
 actions:
-  - action: Read an explicitly supplied fixture and produce a private draft.
+  - action: Read one current-policy-authorized synthetic fixture and produce an in-process private draft.
     class: automatic
-    enforced_by: local runner with exact-scope and batch-limit checks
+    enforced_by: local-python adapter with trusted requester, exact-scope, per-record policy, telemetry, deadline, and stop checks
     approver: null
     preview: []
-  - action: Send, write, close, assign, or publish the suggested disposition.
+  - action: Accept, change, or reject the route suggestion outside this adapter.
+    class: human_per_action
+    enforced_by: no final-disposition capability exists; result names the human owner and remains draft
+    approver: Anushrut Gupta
+    preview: [event identity, suggested route, reason codes, confidence, exact source spans, sensitive and abstention flags]
+  - action: Send, write, close, assign, alert, or publish the suggested disposition.
     class: prohibited
-    enforced_by: no adapter capability or implementation path exists
-    approver: human-disposition-owner
-    preview: [action, target, recipient, payload, reversibility]
+    enforced_by: no adapter capability, destination, credential, network call, or implementation path exists
+    approver: Anushrut Gupta
+    preview: [action, target, recipient, payload, limits, reversibility]
 invalidation:
-  - changed target
-  - changed payload
-  - new permission or tool
-  - expanded batch or recipient set
-  - higher risk tier
+  - changed target, payload, source version, route, or event content
+  - changed requester, operator, policy, permission, tool, or adapter
+  - expanded batch, recipient set, destination, cost, or risk tier
+  - expiry, replay, incident, or kill-switch activation

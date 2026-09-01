@@ -1,26 +1,40 @@
 # Governance
 
-## Roles
+## Accountable owners for the Gate 2 pilot
 
-- **Repository steward:** maintains structure, validation, releases, and lifecycle state.
-- **Tutorial maintainer:** owns correctness and review cadence for one tutorial.
-- **Domain reviewer:** checks that the workflow matches the real job and boundaries.
-- **Reproducibility reviewer:** reruns instructions from a clean environment.
-- **Security/reliability reviewer:** required for T3 and available for escalations.
+- **Repository steward, tutorial maintainer, domain owner, disposition owner, and
+  security-exception owner:** Anushrut Gupta.
+- **Reliability/reproducibility reviewer:** independent reviewer bot
+  `372780cd-861e-43a3-8b37-939b82cfa693`.
 
-No author may self-certify independent reproduction. Reviewers may block publication
-when evidence does not support a claim, controls are weaker than documented, or data
-provenance is unclear.
+These identities apply to the current single-pilot Gate 2 scope. Future tutorials must
+name their own accountable people; role placeholders do not satisfy the schema.
+
+No author may self-certify independent reproduction. The reviewer may block merge or
+publication when evidence does not support a claim, controls are weaker than documented,
+or provenance is unclear.
 
 ## Decisions
 
 Normative standard changes require a pull request, impact notes, migration guidance,
-and steward plus reviewer approval. Tutorial publication follows its tier-specific
-gates. Security fixes may be embargoed until a safe release is available.
+and steward plus independent-review approval. The frozen Gate 2 rubric may not be
+weakened to make an implementation pass. Security fixes may be privately coordinated
+until a safe patch exists.
 
-## Maintenance
+## Maintenance and invalidation
 
-Review cadence: annually for T0–T1, every six months for T2, quarterly for T3, and
-immediately after material incidents, permission changes, or platform/model changes.
-Stale tutorials must be marked `deprecated` or `withdrawn`; they must not silently
-retain a `published` status.
+Review cadence is annual for T0–T1, six-monthly for T2, quarterly for T3, and immediate
+after material incidents or permission, policy, runtime, dependency, model, or adapter
+changes.
+
+Every material change invokes the lifecycle invalidation rule in
+`src/howtobot/lifecycle.py`: status becomes `needs_retest`, `retest_required` becomes
+true, and unsupported claims remain blocked until the complete gate and required
+independent review pass again. Validator cross-file checks reject inconsistent status.
+
+Issues: <https://github.com/hasura/how-to-bot/issues>. Sensitive vulnerabilities:
+<https://github.com/hasura/how-to-bot/security/advisories/new>.
+
+Stale or broken material must not remain current. Mark it `needs_retest` immediately,
+then either restore evidence, migrate with a documented replacement, deprecate it, or
+withdraw it. Record every state/version change in the tutorial changelog.

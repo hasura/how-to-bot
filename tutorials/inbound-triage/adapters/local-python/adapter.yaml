@@ -1,17 +1,49 @@
 tutorial_id: inbound-triage
 adapter_id: local-python
-version: 0.1.0
-authentication: caller-supplied local scope set; no credential
-concrete_scope: inbound_events:read
-tools: [Python 3.11 standard library]
-approval_enforcement: no impact operation exists
-idempotency: SHA-256 semantic key with example in-memory ledger
-telemetry: structured result only; raw content omitted
-kill_switch: boolean checked before validation or execution
-credential_revocation: not applicable
-teardown: delete local output
+version: 0.2.0
+runtime:
+  implementation: CPython
+  tested_version: 3.14.4
+  dependencies:
+    - how-to-bot 0.2.0
+authentication:
+  identity_source: trusted RequestContext supplied by the adapter
+  requester: synthetic-user-operator
+  operator: synthetic-operator
+  policy_version: policy-2026-09-01
+authorization:
+  exact_scope: inbound_events:read
+  checks: [requester identity, current policy version, record id, source, source version, reporter ownership]
+  decision_time: before subject/body validation or routing
+tools: [Python standard library, SQLite]
+approval_enforcement: no impact operation or destination exists; every result names Anushrut Gupta as required final-disposition owner
+idempotency:
+  store: SQLite DurableLedger
+  identity: event id
+  immutable_intent: SHA-256 over timestamp, source, source version, subject, body, and reporter
+  guarantees: [atomic in-process and cross-instance claim, serial and concurrent exact-replay suppression, changed-content conflict, interrupted-claim recovery]
+telemetry:
+  sink: redacted structured in-process TelemetrySink
+  events: [transition, policy_decision, retry]
+  access: [tutorial-maintainer, independent-reviewer]
+  retention_days: 30
+  loss_behavior: fail visibly before authorization or routing
+limits:
+  max_items_per_run: 25
+  max_text_length: 4000
+  max_runtime_seconds: 30
+  max_event_age_days: 7
+  max_future_skew_minutes: 5
+  repeated_error_stop: 2 failed attempts
+kill_switch:
+  owner: Anushrut Gupta
+  reachability: independent shared object callable without model/content cooperation
+  checkpoints: [received, authorized, validated, planned, executing, classified]
+  resume: owner-only after reconciliation
+teardown: Owner deletes the SQLite ledger and generated local output; telemetry is process-local.
 unsupported:
-  - live source ingestion
-  - durable or concurrent replay protection
-  - external write, send, close, assignment, or publication
-  - production routing accuracy claim
+  - live source ingestion or credentials
+  - multi-host or distributed replay protection
+  - external write, send, close, assignment, alert, or publication
+  - model-based routing or production routing accuracy
+  - recurring or unattended execution

@@ -1,25 +1,46 @@
 # Threat model
 
-## Assets and boundaries
+## Actors, assets, classifications, and boundaries
 
-Assets: inbound content, reporter privacy, routing integrity, and human disposition
-authority. Trust crosses from untrusted event text into deterministic validation and
-policy code, then into a private draft viewed by an authorized operator.
+The requester is `synthetic-user-operator`; the operator is `synthetic-operator`.
+Anushrut Gupta owns source policy, final disposition, sensitive exceptions, ledger
+administration, and stop control. The synthetic reporter is the affected party.
+The concrete tool is local-python adapter 0.2.0 with Python 3.14.4 and SQLite. There is
+no model, credential, live source, network host, or external destination.
 
-## Threats and controls
+Assets are inbound content, reporter privacy, current authorization policy, routing
+integrity, human disposition authority, replay state, and audit history. Fixtures are
+synthetic; live inbound content is modeled as confidential; telemetry is redacted
+operational metadata.
 
-| Threat | Control |
+Trust boundaries:
+
+1. Untrusted event metadata is compared with trusted current policy before content use.
+2. Untrusted subject/body crosses into deterministic policy strictly as data.
+3. Grounding stores source/version/field/span/hash, not quoted text, in results/history.
+4. Final disposition remains outside the adapter with the named human.
+
+## Threats and executable controls
+
+| Threat | Control and regression evidence |
 |---|---|
-| Prompt injection in subject/body | Text is treated as data; it cannot alter scopes, tools, or rules |
-| Excessive agency | No write/send adapter exists; output is always a human-owned draft |
-| Confused deputy / broader identity | Exact required scope; broader or missing scope fails closed |
-| Sensitive content routed routinely | Sensitive terms force the security queue |
-| Replay | Semantic idempotency key and explicit duplicate result |
-| Scope explosion | Batch cardinality and text-size limits |
-| Data leakage | Synthetic fixtures, no network, no raw-content logging in output |
-| Runaway work | Fixed batch/text/runtime operating envelope and independent kill-switch input |
-| Similar/ambiguous target | Pilot suggests a queue only; it does not resolve or mutate records |
+| Differently authorized or revoked requester | Current requester/record/source/version/reporter decision before content; denial-leak tests |
+| Stale policy or source version | Exact policy/source-version match; drift tests |
+| Prompt injection | Text cannot alter tools, scope, policy, approval, owner, or impact |
+| Excessive agency | No destination/network/effect method; every result remains draft |
+| Sensitive routine handling | Exact evidence triggers security transfer to Anushrut Gupta |
+| Unsupported or contradictory evidence | Explicit abstention with no suggested resolution |
+| Concurrent/replayed delivery | SQLite atomic claim; exact reuse; changed-content conflict |
+| Adapter crash after claim | Durable intent plus owner-marked interruption and reconciled retry |
+| Runaway work | Batch/text/freshness/deadline/repeated-error limits |
+| Ignored stop | Independently reachable owner switch checked mid-run; reconciled resume |
+| Telemetry leakage | No raw content; ACL/retention/redaction tests |
+| Telemetry outage | Visible failure before authorization/routing; no impact exists |
+| Stale state | Seven-day owner-enforced purge, per-record delete, and full reset |
 
-Residual risk: keyword routing is illustrative, can miss nuance, and must not be
-represented as a production classifier. Live adapters require data-owner review,
-durable replay state, privacy controls, and independent reproduction.
+## Residual limits
+
+Keyword policy is illustrative and can miss semantic nuance. SQLite covers local
+cross-instance concurrency but not multiple hosts. The frozen set is small and
+synthetic. No claim is made for live ingestion, distributed idempotency, model routing,
+external actions, production accuracy, reliability, portability, or safety.
